@@ -73,47 +73,4 @@ To run or build this project, you will need:
    ```
    *This command will compile the Rust backend and launch the desktop application.*
 
----
 
-## How to Use Refinery
-
-### 1. Configuration (Important)
-Refinery uses AI providers to access multiple models. To enable AI features:
-1. Click the **Settings (⚙️)** icon in the top right corner.
-2. Enter your **OpenRouter** or **Groq** API Key (Keys are stored securely in your OS keychain).
-3. Select your preferred **Model** from the dropdown.
-4. Click **Test Connection** to verify your key, then click **Save**.
-
-### 2. Creating & Editing Pages
-- Open the **Sidebar** by clicking the **☰** icon in the top left.
-- Click the **+** button to create a new page.
-- Type or paste your writing into the editor. The editor autosaves your work locally into a SQLite database.
-- Use the toolbar or standard keyboard shortcuts to format your text.
-
-### 3. Reviewing AI Suggestions
-When you are ready to refine your text:
-1. Ensure the editor is active and you have some text written.
-2. Click the **Review** tab in the top right.
-3. Choose an assisting voice from the **Assisting Voice** model dropdown.
-4. Click the **Begin Polishing** button in the sidebar panel. 
-5. The AI will analyze your text and return clean, flat correction cards in the right sidebar.
-6. Review suggestions using the ultra-minimalist inline comparison:
-   - **Original Text** is displayed in a light-red strikethrough.
-   - **Proposed Text** is displayed in a bold, light-green highlighted wrapper.
-7. Click the circular **Approve (✓)** or **Reject (×)** buttons floating on the top-right of each card (visible on hover) to accept or discard edits.
-8. Click **Apply Changes** to merge your approved edits directly into your active draft.
-
-*(Note: Applying changes automatically creates a snapshot in your Version History).*
-
-### 4. Version History
-If you want to revert a page to a previous state:
-1. Open the **Sidebar**.
-2. Right-click on a page and select options, or open the context menu.
-3. Every time you apply AI changes, a snapshot is created. You can restore previous snapshots from the backend version history system.
-
-### 5. Side-by-Side Comparison
-To compare two distinct pieces of text:
-1. Click the **Compare** button in the top right.
-2. Paste your original text in **Text A** and your modified text in **Text B**.
-3. Click **Compare**. 
-4. The tool will provide a character-level diff and a structured AI analysis highlighting the strengths and weaknesses of both versions.
