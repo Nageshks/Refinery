@@ -9,7 +9,7 @@ const providersStore = useProvidersStore();
 const appStore = useAppStore();
 
 const currentTab = ref<'appearance' | 'providers'>('appearance');
-const activeSubTab = ref<'openrouter' | 'groq'>('openrouter');
+const activeSubTab = ref<'openrouter' | 'groq' | 'nvidia'>('openrouter');
 const showApiKey = ref(false);
 
 const testing = ref(false);
@@ -29,6 +29,15 @@ const groqConfig = ref({
   name: 'Groq',
   endpoint: 'https://api.groq.com/openai/v1/chat/completions',
   selectedModel: 'llama-3.3-70b-versatile',
+  apiKey: '',
+  enabled: false,
+});
+
+const nvidiaConfig = ref({
+  id: null as string | null,
+  name: 'NVIDIA NIM',
+  endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+  selectedModel: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
   apiKey: '',
   enabled: false,
 });
@@ -67,8 +76,25 @@ onMounted(async () => {
     } catch {}
   }
 
+  // Load NVIDIA NIM
+  const nv = list.find(p => p.provider_type === 'nvidia');
+  if (nv) {
+    nvidiaConfig.value.id = nv.id;
+    nvidiaConfig.value.name = nv.name;
+    nvidiaConfig.value.endpoint = nv.endpoint || 'https://integrate.api.nvidia.com/v1/chat/completions';
+    nvidiaConfig.value.selectedModel = nv.selected_model;
+    nvidiaConfig.value.enabled = nv.enabled;
+    try {
+      const store = await Store.load('credentials.json');
+      const key = await store.get<string>(`apikey_${nv.id}`);
+      if (key) nvidiaConfig.value.apiKey = key;
+    } catch {}
+  }
+
   // Set default active provider tab
-  if (groqConfig.value.enabled) {
+  if (nvidiaConfig.value.enabled) {
+    activeSubTab.value = 'nvidia';
+  } else if (groqConfig.value.enabled) {
     activeSubTab.value = 'groq';
   } else {
     activeSubTab.value = 'openrouter';
@@ -87,10 +113,33 @@ const providerList = computed(() => [
     name: 'Groq', 
     icon: '⚡', 
     enabled: groqConfig.value.enabled 
+  },
+  { 
+    id: 'nvidia' as const, 
+    name: 'NVIDIA NIM', 
+    icon: '💚', 
+    enabled: nvidiaConfig.value.enabled 
   }
 ]);
 
 const currentProviderDetails = computed(() => {
+  if (activeSubTab.value === 'nvidia') {
+    return {
+      name: 'NVIDIA NIM',
+      icon: '💚',
+      desc: 'Access high-performance NVIDIA NIM models optimized for local and cloud deployment',
+      keyPlaceholder: 'nvapi-...',
+      defaultEndpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+      models: [
+        'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+        'deepseek-ai/deepseek-v4-flash',
+        'deepseek-ai/deepseek-v4-pro',
+        'mistralai/mistral-medium-3.5-128b',
+        'z-ai/glm-5.1',
+        'moonshotai/kimi-k2.6'
+      ]
+    };
+  }
   if (activeSubTab.value === 'groq') {
     return {
       name: 'Groq',
@@ -125,6 +174,7 @@ const currentProviderDetails = computed(() => {
 });
 
 const currentConfig = computed(() => {
+  if (activeSubTab.value === 'nvidia') return nvidiaConfig.value;
   return activeSubTab.value === 'openrouter' ? openrouterConfig.value : groqConfig.value;
 });
 
@@ -132,15 +182,27 @@ const handleActiveToggle = (e: Event) => {
   const checked = (e.target as HTMLInputElement).checked;
   if (activeSubTab.value === 'openrouter') {
     openrouterConfig.value.enabled = checked;
-    if (checked) groqConfig.value.enabled = false;
-  } else {
+    if (checked) {
+      groqConfig.value.enabled = false;
+      nvidiaConfig.value.enabled = false;
+    }
+  } else if (activeSubTab.value === 'groq') {
     groqConfig.value.enabled = checked;
-    if (checked) openrouterConfig.value.enabled = false;
+    if (checked) {
+      openrouterConfig.value.enabled = false;
+      nvidiaConfig.value.enabled = false;
+    }
+  } else {
+    nvidiaConfig.value.enabled = checked;
+    if (checked) {
+      openrouterConfig.value.enabled = false;
+      groqConfig.value.enabled = false;
+    }
   }
 };
 
-const handleSave = async (type: 'openrouter' | 'groq') => {
-  const config = type === 'openrouter' ? openrouterConfig.value : groqConfig.value;
+const handleSave = async (type: 'openrouter' | 'groq' | 'nvidia') => {
+  const config = type === 'openrouter' ? openrouterConfig.value : type === 'groq' ? groqConfig.value : nvidiaConfig.value;
   try {
     const saved = await providersStore.saveProvider({
       id: config.id || undefined,
@@ -171,8 +233,8 @@ const handleSave = async (type: 'openrouter' | 'groq') => {
   }
 };
 
-const handleTest = async (type: 'openrouter' | 'groq') => {
-  const config = type === 'openrouter' ? openrouterConfig.value : groqConfig.value;
+const handleTest = async (type: 'openrouter' | 'groq' | 'nvidia') => {
+  const config = type === 'openrouter' ? openrouterConfig.value : type === 'groq' ? groqConfig.value : nvidiaConfig.value;
   testing.value = true;
   testResult.value = null;
   try {

@@ -31,7 +31,7 @@ Refinery never hijacks your writing. Unlike standard chatbots that completely re
 - **Side-by-Side Comparison Tool**: Paste any two versions of a draft to see character-level differences and a deep AI analysis of style, flow, and expression.
 - **Command Palette**: Speed up your editing workflow with a native, keyboard-first command palette.
 - **Vibrant Dark & Light Modes**: Beautiful, premium color systems designed for focused day and night writing.
-- **Multiple AI Providers**: Seamless support for **OpenRouter** and **Groq** to select your favorite assisting voices.
+- **Multiple AI Providers**: Seamless support for **OpenRouter**, **Groq**, and **NVIDIA NIM** to select your favorite assisting voices.
 
 ---
 

@@ -19,7 +19,7 @@ pub async fn start_review(
     endpoint: Option<String>,
 ) -> AppResult<ReviewResult> {
     // 1. Load page content
-    let (page_content, session_id) = {
+    let (page_content, session_id, provider_id) = {
         let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
         let page = db::get_page(&conn, &page_id)?
             .ok_or_else(|| AppError::NotFound(format!("Page '{}' not found", page_id)))?;
@@ -28,12 +28,18 @@ pub async fn start_review(
             return Err(AppError::Validation("Page content is empty. Write something first.".to_string()));
         }
 
+        let provider_id = db::list_provider_configs(&conn)?
+            .into_iter()
+            .find(|c| c.enabled)
+            .map(|c| c.provider_type)
+            .unwrap_or_else(|| "openrouter".to_string());
+
         // 2. Create review session record
         let session_id = Uuid::new_v4().to_string();
         let session = ReviewSession {
             id: session_id.clone(),
             page_id: page_id.clone(),
-            provider_id: "openrouter".to_string(),
+            provider_id: provider_id.clone(),
             model_id: model.clone(),
             prompt_version: prompts::PROMPT_VERSION.to_string(),
             raw_response: String::new(),
@@ -43,7 +49,7 @@ pub async fn start_review(
         db::insert_review_session(&conn, &session)?;
         db::set_page_review_session(&conn, &page_id, &session_id)?;
 
-        (page.content, session_id)
+        (page.content, session_id, provider_id)
     };
 
     // 3. Call AI provider (outside lock)
@@ -76,7 +82,7 @@ pub async fn start_review(
         let session = ReviewSession {
             id: session_id.clone(),
             page_id: page_id.clone(),
-            provider_id: "openrouter".to_string(),
+            provider_id,
             model_id: String::new(),
             prompt_version: prompts::PROMPT_VERSION.to_string(),
             raw_response: raw_response.clone(),

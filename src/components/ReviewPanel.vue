@@ -67,10 +67,23 @@ const groqModelsList: ModelDetail[] = [
   { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (16e)', useCase: 'Highly creative, nuance & character dialog', icon: '🔍' }
 ];
 
+const nvidiaModelsList: ModelDetail[] = [
+  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'Nemotron 3 Nano Omni', useCase: 'Multi-modal reasoning & long-context text synthesis', icon: '🧠' },
+  { id: 'deepseek-ai/deepseek-v4-flash', name: 'DeepSeek V4 Flash', useCase: 'MoE optimized for ultra-fast coding & drafts', icon: '🌀' },
+  { id: 'deepseek-ai/deepseek-v4-pro', name: 'DeepSeek V4 Pro', useCase: 'High MoE scaling for heavy editorial revisions', icon: '🚀' },
+  { id: 'mistralai/mistral-medium-3.5-128b', name: 'Mistral Medium 3.5', useCase: 'High performing agentic rewrite', icon: '🌪️' },
+  { id: 'z-ai/glm-5.1', name: 'GLM 5.1', useCase: 'Flagship LLM for agentic workflows & deep reasoning', icon: '✨' },
+  { id: 'moonshotai/kimi-k2.6', name: 'Kimi k2.6', useCase: '1T MoE long-context coding & reasoning', icon: '🌊' }
+];
+
 const modelsList = computed(() => {
   const active = providersStore.activeProvider;
-  if (active && active.provider_type === 'groq') {
-    return groqModelsList;
+  if (active) {
+    if (active.provider_type === 'groq') {
+      return groqModelsList;
+    } else if (active.provider_type === 'nvidia') {
+      return nvidiaModelsList;
+    }
   }
   return openrouterModelsList;
 });
