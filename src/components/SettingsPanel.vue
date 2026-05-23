@@ -4,15 +4,17 @@ import { useProvidersStore } from '../stores/providers';
 import { useAppStore } from '../stores/app';
 import { Store } from '@tauri-apps/plugin-store';
 import { testProvider, setActiveProvider } from '../composables/useTauri';
+import { useAuditStore, type PageTypeDefinition, type AuditCheckDefinition, type AuditWidgetType } from '../stores/audit';
 
 const providersStore = useProvidersStore();
 const appStore = useAppStore();
+const auditStore = useAuditStore();
 
 watch(() => appStore.gpuAccelerationEnabled, () => {
   appStore.notify('GPU setting updated. Please restart Refinery to apply.', 'info');
 });
 
-const currentTab = ref<'appearance' | 'providers' | 'testing'>('appearance');
+const currentTab = ref<'appearance' | 'providers' | 'testing' | 'page_types'>('appearance');
 const activeSubTab = ref<'openrouter' | 'groq' | 'nvidia'>('openrouter');
 const showApiKey = ref(false);
 
@@ -496,6 +498,145 @@ const setAccentColor = (color: any) => {
 const setHighlightColor = (color: any) => {
   appStore.highlightColor = color;
 };
+
+// ─── Page Types Editor Local State ───
+const selectedPageTypeId = ref<string | null>(null);
+const editingPageType = ref<PageTypeDefinition | null>(null);
+
+const newCheckName = ref('');
+const newCheckWidgetType = ref<AuditWidgetType>('binary');
+const newCheckPrompt = ref('');
+
+const selectPageTypeForEdit = (id: string) => {
+  if (id === 'new') {
+    editingPageType.value = {
+      id: 'pt_' + Math.random().toString(36).substring(2, 9),
+      name: '',
+      icon: '📝',
+      inheritDefault: true,
+      checks: []
+    };
+    selectedPageTypeId.value = 'new';
+  } else {
+    const pt = auditStore.getPageType(id);
+    if (pt) {
+      editingPageType.value = JSON.parse(JSON.stringify(pt));
+      selectedPageTypeId.value = id;
+    }
+  }
+};
+
+const saveEditingPageType = async () => {
+  if (!editingPageType.value) return;
+  if (!editingPageType.value.name.trim()) {
+    appStore.notify('Page Type name is required', 'error');
+    return;
+  }
+
+  try {
+    if (selectedPageTypeId.value === 'new') {
+      await auditStore.addPageType(editingPageType.value);
+      appStore.notify('Page Type created successfully', 'success');
+    } else {
+      await auditStore.updatePageType(editingPageType.value);
+      appStore.notify('Page Type updated successfully', 'success');
+    }
+    cancelEditingPageType();
+  } catch (err) {
+    appStore.notify('Failed to save Page Type', 'error');
+  }
+};
+
+const cancelEditingPageType = () => {
+  selectedPageTypeId.value = null;
+  editingPageType.value = null;
+  newCheckName.value = '';
+  newCheckWidgetType.value = 'binary';
+  newCheckPrompt.value = '';
+  cancelEditingCheck();
+};
+
+const deletePageType = (id: string) => {
+  if (id === 'default') {
+    appStore.notify('Cannot delete the default page type', 'error');
+    return;
+  }
+
+  triggerConfirmation(
+    'Delete Page Type',
+    'Are you sure you want to delete this Page Type? Documents assigned to it will fallback to General Document.',
+    async () => {
+      try {
+        await auditStore.deletePageType(id);
+        appStore.notify('Page Type deleted successfully', 'success');
+      } catch (err) {
+        appStore.notify('Failed to delete Page Type', 'error');
+      }
+    }
+  );
+};
+
+const addCheckToEditing = () => {
+  if (!editingPageType.value) return;
+  if (!newCheckName.value.trim() || !newCheckPrompt.value.trim()) {
+    appStore.notify('Check Name and AI Prompt instruction are required', 'error');
+    return;
+  }
+
+  editingPageType.value.checks.push({
+    id: 'chk_' + Math.random().toString(36).substring(2, 9),
+    name: newCheckName.value.trim(),
+    widgetType: newCheckWidgetType.value,
+    prompt: newCheckPrompt.value.trim()
+  });
+
+  newCheckName.value = '';
+  newCheckWidgetType.value = 'binary';
+  newCheckPrompt.value = '';
+  appStore.notify('Check added', 'success');
+};
+
+const removeCheckFromEditing = (checkId: string) => {
+  if (!editingPageType.value) return;
+  editingPageType.value.checks = editingPageType.value.checks.filter(c => c.id !== checkId);
+};
+
+// ─── Inline Checklist Parameter Editing State ───
+const editingCheckId = ref<string | null>(null);
+const editingCheckName = ref('');
+const editingCheckWidgetType = ref<AuditWidgetType>('binary');
+const editingCheckPrompt = ref('');
+
+const startEditingCheck = (chk: AuditCheckDefinition) => {
+  editingCheckId.value = chk.id;
+  editingCheckName.value = chk.name;
+  editingCheckWidgetType.value = chk.widgetType;
+  editingCheckPrompt.value = chk.prompt;
+};
+
+const saveEditedCheck = () => {
+  if (!editingPageType.value || !editingCheckId.value) return;
+  if (!editingCheckName.value.trim() || !editingCheckPrompt.value.trim()) {
+    appStore.notify('Check Name and AI Prompt instruction are required', 'error');
+    return;
+  }
+
+  const check = editingPageType.value.checks.find(c => c.id === editingCheckId.value);
+  if (check) {
+    check.name = editingCheckName.value.trim();
+    check.widgetType = editingCheckWidgetType.value;
+    check.prompt = editingCheckPrompt.value.trim();
+    appStore.notify('Parameter updated', 'success');
+  }
+  cancelEditingCheck();
+};
+
+const cancelEditingCheck = () => {
+  editingCheckId.value = null;
+  editingCheckName.value = '';
+  editingCheckWidgetType.value = 'binary';
+  editingCheckPrompt.value = '';
+};
 </script>
 
 <template>
@@ -525,6 +666,12 @@ const setHighlightColor = (color: any) => {
           @click="currentTab = 'testing'"
         >
           <span class="tab-icon">🧪</span> Model Testing
+        </button>
+        <button 
+          :class="['settings-tab', { active: currentTab === 'page_types' }]"
+          @click="currentTab = 'page_types'"
+        >
+          <span class="tab-icon">📝</span> Page Types
         </button>
       </div>
 
@@ -1157,6 +1304,272 @@ const setHighlightColor = (color: any) => {
                         🗑️
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Page Types Settings Tab -->
+        <div v-else-if="currentTab === 'page_types'" class="settings-tab-content page-types-tab-view">
+          <!-- List Mode -->
+          <div v-if="!editingPageType" class="page-types-list-layout">
+            <div class="editor-header-area list-header-area">
+              <div class="editor-header-title-block">
+                <h3 class="editor-title">Document Blueprints</h3>
+                <p class="editor-desc">Define custom page types with specific AI-driven audit instructions and parameters.</p>
+              </div>
+              <button class="btn btn-primary btn-create-blueprint" @click="selectPageTypeForEdit('new')">
+                ✨ Create Page Type
+              </button>
+            </div>
+
+            <div class="blueprints-grid">
+              <div 
+                v-for="pt in auditStore.pageTypes" 
+                :key="pt.id" 
+                class="blueprint-card"
+                :class="{ 'is-default': pt.id === 'default' }"
+              >
+                <div class="blueprint-card-header flex-between">
+                  <div class="blueprint-title flex items-center gap-3">
+                    <span class="blueprint-icon">{{ pt.icon || '📄' }}</span>
+                    <div>
+                      <h4 class="blueprint-name">{{ pt.name }}</h4>
+                      <span class="blueprint-id-badge">ID: {{ pt.id }}</span>
+                    </div>
+                  </div>
+                  <div class="blueprint-badge" :class="{ 'badge-accent': pt.id !== 'default', 'badge-neutral': pt.id === 'default' }">
+                    {{ pt.checks.length }} parameters
+                  </div>
+                </div>
+
+                <div class="blueprint-card-body">
+                  <div class="blueprint-preview-checks">
+                    <div v-for="chk in pt.checks.slice(0, 3)" :key="chk.id" class="blueprint-preview-check">
+                      <span class="widget-type-dot" :class="chk.widgetType"></span>
+                      <span class="check-name">{{ chk.name }}</span>
+                    </div>
+                    <div v-if="pt.checks.length > 3" class="blueprint-more-checks">
+                      + {{ pt.checks.length - 3 }} more parameters
+                    </div>
+                    <div v-if="pt.inheritDefault && pt.id !== 'default'" class="blueprint-inheritance-note">
+                      🔗 Inherits General Document parameters
+                    </div>
+                  </div>
+                </div>
+
+                <div class="blueprint-card-actions flex items-center gap-2">
+                  <button 
+                    class="btn btn-sm btn-outline btn-blueprint-action" 
+                    @click="selectPageTypeForEdit(pt.id)"
+                  >
+                    ✏️ Edit Blueprint
+                  </button>
+                  <button 
+                    v-if="pt.id !== 'default'"
+                    class="btn btn-sm btn-outline btn-text-error btn-blueprint-action" 
+                    @click="deletePageType(pt.id)"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Editor Mode -->
+          <div v-else class="page-types-editor-layout">
+            <div class="editor-header-area">
+              <button class="btn btn-ghost btn-icon btn-sm btn-back" @click="cancelEditingPageType">
+                ← Back
+              </button>
+              <div class="editor-header-title-block">
+                <h3 class="editor-title">
+                  {{ selectedPageTypeId === 'new' ? 'New Page Blueprint' : `Edit Blueprint: ${editingPageType.name}` }}
+                </h3>
+                <p class="editor-desc">Configure the name, icon, and specific audit rules for this page type.</p>
+              </div>
+            </div>
+
+            <div class="editor-grid">
+              <!-- Sidebar Info Card -->
+              <div class="editor-sidebar-column">
+                <div class="card appearance-card">
+                  <h4 class="card-section-title">Blueprint Identity</h4>
+                  
+                  <div class="form-field" style="margin-bottom: var(--space-4);">
+                    <label class="label">Blueprint Name</label>
+                    <input 
+                      type="text" 
+                      class="input" 
+                      v-model="editingPageType.name" 
+                      placeholder="e.g. Blog Post, Newsletter" 
+                    />
+                  </div>
+
+                  <div class="form-field" style="margin-bottom: var(--space-4);">
+                    <label class="label">Emoji Icon</label>
+                    <input 
+                      type="text" 
+                      class="input" 
+                      v-model="editingPageType.icon" 
+                      placeholder="e.g. 📝, ✉️, 📢" 
+                      style="width: 80px; text-align: center; font-size: 1.5rem;"
+                    />
+                  </div>
+
+                  <div v-if="editingPageType.id !== 'default'" class="setting-item flex-between" style="padding-top: var(--space-2); flex-direction: row; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                      <h5 class="setting-label">Inherit Defaults</h5>
+                      <p class="setting-desc">Run General Document checks in addition to custom ones.</p>
+                    </div>
+                    <label class="switch-container">
+                      <input type="checkbox" v-model="editingPageType.inheritDefault" class="switch-input" />
+                      <span class="switch-slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="editor-sidebar-actions" style="margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);">
+                  <button class="btn btn-primary" @click="saveEditingPageType" style="width: 100%;">
+                    💾 Save Page Blueprint
+                  </button>
+                  <button class="btn btn-outline" @click="cancelEditingPageType" style="width: 100%;">
+                    Discard Changes
+                  </button>
+                </div>
+              </div>
+
+              <!-- Main Checklist Column -->
+              <div class="editor-main-column">
+                <div class="card appearance-card checklist-card-layout">
+                  <h4 class="card-section-title flex-between">
+                    <span>📋 Audit Parameters Checklist</span>
+                    <span class="badge badge-accent">{{ editingPageType.checks.length }} defined</span>
+                  </h4>
+
+                  <!-- Checklist parameters -->
+                  <div class="blueprint-checklist-scroller flex-grow">
+                    <div v-if="editingPageType.checks.length === 0" class="checklist-empty-state">
+                      <div class="empty-icon">📌</div>
+                      <h5 class="empty-title">No parameters defined yet</h5>
+                      <p class="empty-desc">Add at least one audit parameter below to configure how the AI analyzes this page type.</p>
+                    </div>
+                    <div v-else class="checklist-items">
+                      <div v-for="(chk, idx) in editingPageType.checks" :key="chk.id" :class="['checklist-item-card', chk.widgetType]">
+                        <!-- Inline Edit Mode -->
+                        <div v-if="editingCheckId === chk.id" class="inline-edit-check-form">
+                          <div class="inline-edit-row">
+                            <div class="form-field">
+                              <label class="label text-xs">Parameter Name</label>
+                              <input 
+                                type="text" 
+                                class="input inline-edit-input" 
+                                v-model="editingCheckName" 
+                              />
+                            </div>
+                            <div class="form-field">
+                              <label class="label text-xs">Type</label>
+                              <select class="input select inline-edit-select" v-model="editingCheckWidgetType">
+                                <option value="binary">Yes / No</option>
+                                <option value="scale_1_5">1 to 5</option>
+                                <option value="text_match">AI Extract</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div class="form-field">
+                            <label class="label text-xs">AI Prompt Instruction</label>
+                            <textarea 
+                              class="input textarea inline-edit-textarea" 
+                              v-model="editingCheckPrompt" 
+                              rows="5"
+                            ></textarea>
+                          </div>
+                          <div class="flex justify-end gap-2 inline-edit-actions">
+                            <button class="btn btn-xs btn-outline" @click="cancelEditingCheck">
+                              Cancel
+                            </button>
+                            <button class="btn btn-xs btn-primary btn-save-inline" @click="saveEditedCheck">
+                              ✓ Save
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Read Mode -->
+                        <div v-else>
+                          <div class="checklist-item-header flex-between">
+                            <div class="flex items-center gap-2 checklist-item-info">
+                              <span class="checklist-item-number">#{{ idx + 1 }}</span>
+                              <h5 class="checklist-item-name">{{ chk.name }}</h5>
+                              <span class="badge widget-type-badge" :class="chk.widgetType">
+                                {{ chk.widgetType === 'binary' ? 'Yes / No' : chk.widgetType === 'scale_1_5' ? '1 to 5 Scale' : 'AI Text Match' }}
+                              </span>
+                            </div>
+                            <div class="checklist-item-actions flex items-center gap-2">
+                              <button class="btn btn-ghost btn-icon btn-sm" @click="startEditingCheck(chk)" title="Edit Parameter">
+                                ✏️
+                              </button>
+                              <button class="btn btn-ghost btn-icon btn-sm btn-text-error" @click="removeCheckFromEditing(chk.id)" title="Delete Parameter">
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <p class="checklist-item-prompt">{{ chk.prompt }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Inheritance Banner -->
+                  <div v-if="editingPageType.inheritDefault && editingPageType.id !== 'default'" class="checklist-inheritance-banner">
+                    <span class="inheritance-icon">🔗</span>
+                    <div>
+                      <h6 class="inheritance-title">Inheriting Parameters from General Document:</h6>
+                      <p class="text-xs text-secondary inheritance-desc">
+                        Tone Consistency (Yes/No), Clarity & Concision (1-5 Scale), Core Takeaway (AI Text Match). These will run automatically.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Add Parameter Form -->
+                  <div class="add-parameter-form">
+                    <h5 class="add-parameter-title">➕ Add Audit Parameter</h5>
+                    
+                    <div class="form-grid-parameter">
+                      <div class="form-field">
+                        <label class="label text-xs">Parameter Name</label>
+                        <input 
+                          type="text" 
+                          class="input input-sm" 
+                          v-model="newCheckName" 
+                          placeholder="e.g. SEO Focus Keyword, Active Voice" 
+                        />
+                      </div>
+                      <div class="form-field">
+                        <label class="label text-xs">Widget Response Type</label>
+                        <select class="input select select-sm" v-model="newCheckWidgetType">
+                          <option value="binary">Yes / No Indicator</option>
+                          <option value="scale_1_5">1 to 5 Rating Scale</option>
+                          <option value="text_match">AI Extract Text Match</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="form-field">
+                      <label class="label text-xs">AI Prompt Instruction (What should the AI check?)</label>
+                      <textarea 
+                        class="input textarea textarea-sm" 
+                        v-model="newCheckPrompt" 
+                        placeholder="e.g. Extract the primary focus keyword and evaluate if it appears in the first paragraph."
+                        rows="2"
+                      ></textarea>
+                    </div>
+
+                    <button class="btn btn-outline btn-add-param" @click="addCheckToEditing">
+                      ➕ Add Parameter to Blueprint
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2242,5 +2655,587 @@ html[data-theme="light"] .theme-btn:hover {
 @keyframes pulse-badge {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+/* ─── Page Types settings tab styles ─── */
+.page-types-tab-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.page-types-list-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.blueprints-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.blueprint-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 200px;
+  position: relative;
+  transition: all var(--transition-medium);
+}
+.blueprint-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+}
+.blueprint-card.is-default {
+  border-color: rgba(139, 92, 246, 0.2);
+  background: linear-gradient(135deg, var(--bg-secondary), rgba(139, 92, 246, 0.02));
+}
+.blueprint-card.is-default::before {
+  content: 'SYSTEM DEFAULT';
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.blueprint-icon {
+  font-size: 1.8rem;
+}
+.blueprint-name {
+  font-weight: 600;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+.blueprint-id-badge {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.blueprint-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+.blueprint-card-body {
+  margin: var(--space-4) 0;
+  flex-grow: 1;
+}
+.blueprint-preview-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.blueprint-preview-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.widget-type-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.widget-type-dot.binary {
+  background: var(--color-success, #10b981);
+}
+.widget-type-dot.scale_1_5 {
+  background: var(--color-warning, #f59e0b);
+}
+.widget-type-dot.text_match {
+  background: var(--accent-primary, #8b5cf6);
+}
+.blueprint-more-checks {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-left: 14px;
+}
+.blueprint-inheritance-note {
+  font-size: 0.75rem;
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.blueprint-card-actions {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+}
+.btn-blueprint-action {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+}
+
+/* Page Blueprint Editor Layout */
+.page-types-editor-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+}
+.editor-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.editor-sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.editor-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.checklist-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+}
+.badge.widget-type-badge.binary {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--color-success, #10b981);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.badge.widget-type-badge.scale_1_5 {
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+.badge.widget-type-badge.text_match {
+  background: rgba(139, 92, 246, 0.08);
+  color: var(--accent-primary, #8b5cf6);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+.blueprint-checklist-scroller::-webkit-scrollbar {
+  width: 4px;
+}
+.blueprint-checklist-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+.blueprint-checklist-scroller::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+
+/* ─── Premium Page Types Tab Styles ─── */
+.page-types-tab-view {
+  padding: var(--space-6);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+}
+.page-types-list-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.blueprints-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.blueprint-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 200px;
+  position: relative;
+  transition: all var(--transition-medium);
+}
+.blueprint-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+}
+.blueprint-card.is-default {
+  border-color: rgba(139, 92, 246, 0.2);
+  background: linear-gradient(135deg, var(--bg-secondary), rgba(139, 92, 246, 0.02));
+}
+.blueprint-card.is-default::before {
+  content: 'SYSTEM DEFAULT';
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.blueprint-icon {
+  font-size: 1.8rem;
+}
+.blueprint-name {
+  font-weight: 600;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+.blueprint-id-badge {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.blueprint-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+.blueprint-card-body {
+  margin: var(--space-4) 0;
+  flex-grow: 1;
+}
+.blueprint-preview-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.blueprint-preview-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.widget-type-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.widget-type-dot.binary {
+  background: var(--color-success, #10b981);
+}
+.widget-type-dot.scale_1_5 {
+  background: var(--color-warning, #f59e0b);
+}
+.widget-type-dot.text_match {
+  background: var(--accent-primary, #8b5cf6);
+}
+.blueprint-more-checks {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-left: 14px;
+}
+.blueprint-inheritance-note {
+  font-size: 0.75rem;
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.blueprint-card-actions {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+}
+.btn-blueprint-action {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+}
+
+/* Page Blueprint Editor Layout */
+.page-types-editor-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: auto;
+}
+.editor-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+.editor-sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.editor-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Elegant Sub-Header Styling */
+.editor-header-area {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) 0 var(--space-4) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-4);
+  background: transparent;
+}
+.list-header-area {
+  justify-content: space-between;
+}
+.btn-back {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+}
+.btn-back:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.editor-header-title-block .editor-title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-1) 0;
+  letter-spacing: -0.015em;
+}
+.editor-header-title-block .editor-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Premium Checklist Layout & Card Styles */
+.checklist-card-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.blueprint-checklist-scroller {
+  /* Natural expansion to leverage SettingsModal's main scrollbar */
+  margin-bottom: var(--space-4);
+  padding-right: var(--space-1);
+}
+.checklist-empty-state {
+  text-align: center;
+  padding: var(--space-6) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.checklist-empty-state .empty-icon {
+  font-size: 2rem;
+  margin-bottom: var(--space-2);
+}
+.checklist-empty-state .empty-title {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+.checklist-empty-state .empty-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  max-width: 250px;
+  margin: 0 auto;
+}
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.checklist-item-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--border-default);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+.checklist-item-card.binary {
+  border-left-color: var(--color-success, #10b981);
+}
+.checklist-item-card.scale_1_5 {
+  border-left-color: var(--color-warning, #f59e0b);
+}
+.checklist-item-card.text_match {
+  border-left-color: var(--accent-primary, #8b5cf6);
+}
+.checklist-item-card:hover {
+  border-color: var(--border-strong);
+  transform: translateX(2px);
+  background: var(--bg-hover);
+}
+.checklist-item-number {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.checklist-item-name {
+  font-weight: 600;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+.widget-type-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+}
+.checklist-item-prompt {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: var(--space-2) 0 0 0;
+  line-height: 1.4;
+}
+.checklist-item-actions button {
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+}
+.checklist-item-card:hover .checklist-item-actions button {
+  opacity: 1;
+}
+
+/* Inheritance Banner Styles */
+.checklist-inheritance-banner {
+  background: rgba(139, 92, 246, 0.04);
+  border: 1px dashed rgba(139, 92, 246, 0.25);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  align-items: flex-start;
+}
+.checklist-inheritance-banner .inheritance-icon {
+  font-size: 1.1rem;
+}
+.checklist-inheritance-banner .inheritance-title {
+  font-weight: 600;
+  margin: 0 0 2px 0;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+.checklist-inheritance-banner .inheritance-desc {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+/* Add Parameter Form Styles */
+.add-parameter-form {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-4);
+  background: var(--bg-tertiary);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+.add-parameter-title {
+  font-weight: 600;
+  margin: 0 0 var(--space-3) 0;
+  font-size: 0.85rem;
+}
+.form-grid-parameter {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.input-sm, .select-sm {
+  padding: 6px 12px;
+  min-height: 32px;
+  font-size: 0.8rem;
+}
+.textarea-sm {
+  resize: none;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+.btn-add-param {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px var(--space-4);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Inline Edit Form Styles */
+.inline-edit-check-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.inline-edit-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-3);
+}
+.inline-edit-input, .inline-edit-select {
+  padding: 6px 12px;
+  min-height: 32px;
+  font-size: 0.8rem;
+}
+.inline-edit-textarea {
+  resize: vertical;
+  min-height: 120px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.inline-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.btn-save-inline {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  min-height: 32px;
+  font-weight: 600;
 }
 </style>

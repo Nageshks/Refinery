@@ -11,6 +11,7 @@ import ReviewPanel from './components/ReviewPanel.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import CompareView from './components/CompareView.vue';
 import PageSwitcherModal from './components/PageSwitcherModal.vue';
+import AuditPanel from './components/AuditPanel.vue';
 import AppIcon from './components/AppIcon.vue';
 
 
@@ -85,6 +86,7 @@ onUnmounted(() => {
           </div>
         </div>
         <ReviewPanel v-if="appStore.activeView === 'review'" />
+        <AuditPanel v-if="appStore.auditPanelVisible && pagesStore.activePage" />
       </main>
     </div>
 

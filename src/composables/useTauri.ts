@@ -13,6 +13,8 @@ export const updatePage = (pageId: string, title: string, content: string) =>
 export const renamePage = (pageId: string, title: string) =>
   invoke<Page>('rename_page', { pageId, title });
 export const deletePage = (pageId: string) => invoke<void>('delete_page', { pageId });
+export const updatePageFormat = (pageId: string, formatType: string) =>
+  invoke<Page>('update_page_format', { pageId, formatType });
 
 // ─── Review ─────────────────────────────────────────────────────────────
 export const startReview = (pageId: string, apiKey: string, model: string, endpoint?: string) =>

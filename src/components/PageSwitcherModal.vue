@@ -182,6 +182,18 @@ const commands: CommandItem[] = [
       console.log('CommandPalette: Executing Switch to Think Mode.');
       appStore.requestViewSwitch('edit');
     }
+  },
+  {
+    id: 'toggle-audit-panel',
+    title: 'Toggle Draft Auditor Panel',
+    subtitle: 'Show or hide the dynamic Chameleon UI writing auditor sidebar',
+    icon: '🔍',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Toggle Audit Panel.');
+      appStore.auditPanelVisible = !appStore.auditPanelVisible;
+      appStore.notify(`Audit Panel ${appStore.auditPanelVisible ? 'Visible' : 'Hidden'}`, 'success');
+    }
   }
 ];
 

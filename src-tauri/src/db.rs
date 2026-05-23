@@ -209,6 +209,14 @@ pub fn rename_page(conn: &Connection, id: &str, title: &str) -> SqliteResult<()>
     Ok(())
 }
 
+pub fn update_page_format(conn: &Connection, id: &str, format_type: &str) -> SqliteResult<()> {
+    conn.execute(
+        "UPDATE pages SET format_type = ?2, updated_at = datetime('now') WHERE id = ?1",
+        params![id, format_type],
+    )?;
+    Ok(())
+}
+
 pub fn delete_page(conn: &Connection, id: &str) -> SqliteResult<()> {
     conn.execute(
         "UPDATE pages SET local_status = 'deleted', updated_at = datetime('now') WHERE id = ?1",

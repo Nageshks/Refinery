@@ -11,6 +11,7 @@ export const useAppStore = defineStore('app', () => {
   const showCompareModal = ref(false);
   const showSettingsModal = ref(false);
   const showPageSwitcher = ref(false);
+  const auditPanelVisible = ref(false);
   const notification = ref<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showDiscardReviewModal = ref(false);
@@ -266,6 +267,7 @@ export const useAppStore = defineStore('app', () => {
     showCompareModal,
     showSettingsModal,
     showPageSwitcher,
+    auditPanelVisible,
     notification,
     sidebarWidth,
     reviewPanelWidth,

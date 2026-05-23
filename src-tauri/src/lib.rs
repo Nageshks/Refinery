@@ -50,6 +50,7 @@ pub fn run() {
             commands::pages::update_page,
             commands::pages::rename_page,
             commands::pages::delete_page,
+            commands::pages::update_page_format,
             // Review
             commands::review::start_review,
             commands::review::get_review_suggestions,

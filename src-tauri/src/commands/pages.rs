@@ -55,3 +55,11 @@ pub fn delete_page(state: State<'_, AppState>, page_id: String) -> AppResult<()>
     db::delete_page(&conn, &page_id)?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn update_page_format(state: State<'_, AppState>, page_id: String, format_type: String) -> AppResult<Page> {
+    let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
+    db::update_page_format(&conn, &page_id, &format_type)?;
+    db::get_page(&conn, &page_id)?
+        .ok_or_else(|| AppError::NotFound(format!("Page '{}' not found", page_id)))
+}

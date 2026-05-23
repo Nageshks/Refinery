@@ -76,8 +76,21 @@ export const usePagesStore = defineStore('pages', () => {
     }
   };
 
+  const updatePageFormat = async (id: string, formatType: string) => {
+    try {
+      const updated = await api.updatePageFormat(id, formatType);
+      const idx = pages.value.findIndex(p => p.id === id);
+      if (idx >= 0) pages.value[idx] = updated;
+      return updated;
+    } catch (e) {
+      console.error('Failed to update page format:', e);
+      throw e;
+    }
+  };
+
   return {
     pages, activePageId, activePage, loading,
-    fetchPages, createNewPage, selectPage, updateActivePage, renamePage, deletePage
+    fetchPages, createNewPage, selectPage, updateActivePage, renamePage, deletePage, updatePageFormat
   };
 });
+
