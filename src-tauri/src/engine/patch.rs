@@ -154,6 +154,84 @@ pub fn highlight_original(content: &str, all_items: &[SuggestionItem]) -> Result
     Ok(result)
 }
 
+/// Compute a preview where approved items show their replacement text and pending/rejected items show original text, all wrapped in their correct highlight spans.
+pub fn compute_editorial_preview(content: &str, all_items: &[SuggestionItem]) -> Result<String, String> {
+    if all_items.is_empty() {
+        return Ok(content.to_string());
+    }
+
+    let mut result = content.to_string();
+
+    // Filter out conflicting (overlapping) items to ensure safety and prevent index shifting errors
+    let mut safe_items: Vec<SuggestionItem> = Vec::new();
+    for item in all_items {
+        let mut overlap = false;
+        for existing in &safe_items {
+            if item.span_start < existing.span_end && existing.span_start < item.span_end {
+                overlap = true;
+                break;
+            }
+        }
+        if !overlap {
+            safe_items.push(item.clone());
+        }
+    }
+
+    // Sort by span_start descending so we process from end to beginning
+    safe_items.sort_by(|a, b| b.span_start.cmp(&a.span_start));
+
+    for item in &safe_items {
+        // Validate span is within bounds
+        if item.span_end > result.len() {
+            return Err(format!(
+                "Span [{}, {}) exceeds content length {}",
+                item.span_start, item.span_end, result.len()
+            ));
+        }
+
+        // Validate the original text still matches
+        let actual = &result[item.span_start..item.span_end];
+        if actual != item.original_text {
+            return Err(format!(
+                "Content mismatch at [{}, {}): expected '{}', found '{}'",
+                item.span_start,
+                item.span_end,
+                &item.original_text[..item.original_text.len().min(50)],
+                &actual[..actual.len().min(50)]
+            ));
+        }
+
+        let replacement = match item.approval_state.as_str() {
+            "approved" => {
+                // Approved: show replacement text wrapped in inserted span
+                format!(
+                    r#"<span class="preview-highlight-inserted state-approved" data-suggestion-id="{}">{}</span>"#,
+                    item.id, item.replacement_text
+                )
+            }
+            "rejected" => {
+                // Rejected: show original text wrapped in rejected span
+                format!(
+                    r#"<span class="preview-highlight-original preview-original-rejected" data-suggestion-id="{}">{}</span>"#,
+                    item.id, item.original_text
+                )
+            }
+            _ => {
+                // Pending: show original text wrapped in pending highlight span
+                format!(
+                    r#"<span class="preview-highlight-original preview-original-pending" data-suggestion-id="{}">{}</span>"#,
+                    item.id, item.original_text
+                )
+            }
+        };
+
+        result.replace_range(item.span_start..item.span_end, &replacement);
+    }
+
+    Ok(result)
+}
+
+
 /// Detect conflicting (overlapping) patches. Returns pairs of indices.
 pub fn detect_conflicts(items: &[SuggestionItem]) -> Vec<(usize, usize)> {
     let mut conflicts = Vec::new();

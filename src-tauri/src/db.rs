@@ -55,6 +55,83 @@ fn run_migrations(conn: &Connection) -> SqliteResult<()> {
         )?;
     }
 
+    let migration_003_applied: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM _migrations WHERE version = '003'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !migration_003_applied {
+        let sql = "
+            CREATE TABLE IF NOT EXISTS models (
+                id TEXT PRIMARY KEY NOT NULL,
+                provider_type TEXT NOT NULL,
+                name TEXT NOT NULL,
+                use_case TEXT NOT NULL DEFAULT '',
+                icon TEXT NOT NULL DEFAULT '🤖',
+                is_custom INTEGER NOT NULL DEFAULT 0,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+        ";
+        conn.execute_batch(sql)?;
+
+        let defaults = vec![
+            ("openai/gpt-4o-mini", "openrouter", "GPT-4o Mini", "Fast proofreading, grammar & syntax polishing", "⚡"),
+            ("meta-llama/llama-3.3-70b-instruct", "openrouter", "Llama 3.3 70B", "General prose editing & standard revision", "🦙"),
+            ("z-ai/glm-4.5-air", "openrouter", "GLM 4.5 Air", "Creative novels, character dialogue & SEO", "🎨"),
+            ("openrouter/owl-alpha", "openrouter", "Owl Alpha", "Heavy content synthesis & professional drafts", "🦉"),
+            ("google/gemma-4-31b-it", "openrouter", "Gemma 4 31B", "Grammar review & high-accuracy translation", "💎"),
+            ("openai/gpt-oss-120b", "openrouter", "GPT-OSS 120B", "Academic papers, logic flow & structured essays", "🎓"),
+            ("deepseek/deepseek-v4-flash", "openrouter", "DeepSeek V4 Flash", "Long-form narrative & fast token translation", "🌀"),
+            
+            ("openai/gpt-oss-120b", "groq", "GPT-OSS 120B", "Academic papers, logic flow & structured essays", "🎓"),
+            ("llama-3.1-8b-instant", "groq", "Llama 3.1 8B Instant", "Ultra-fast grammar corrections & simple revisions", "⚡"),
+            ("llama-3.3-70b-versatile", "groq", "Llama 3.3 70B Versatile", "General prose editing & standard revision", "🦙"),
+            ("meta-llama/llama-4-scout-17b-16e-instruct", "groq", "Llama 4 Scout 17B (16e)", "Highly creative, nuance & character dialog", "🔍"),
+            
+            ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "nvidia", "Nemotron 3 Nano Omni", "Multi-modal reasoning & long-context text synthesis", "🧠"),
+            ("deepseek-ai/deepseek-v4-flash", "nvidia", "DeepSeek V4 Flash", "MoE optimized for ultra-fast coding & drafts", "🌀"),
+            ("deepseek-ai/deepseek-v4-pro", "nvidia", "DeepSeek V4 Pro", "High MoE scaling for heavy editorial revisions", "🚀"),
+            ("mistralai/mistral-medium-3.5-128b", "nvidia", "Mistral Medium 3.5", "High performing agentic rewrite", "🌪️"),
+            ("z-ai/glm-5.1", "nvidia", "GLM 5.1", "Flagship LLM for agentic workflows & deep reasoning", "✨"),
+            ("moonshotai/kimi-k2.6", "nvidia", "Kimi k2.6", "1T MoE long-context coding & reasoning", "🌊")
+        ];
+
+        for (id, provider_type, name, use_case, icon) in defaults {
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO models (id, provider_type, name, use_case, icon, is_custom, enabled, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, 1, datetime('now'), datetime('now'))",
+                params![id, provider_type, name, use_case, icon],
+            );
+        }
+
+        conn.execute(
+            "INSERT INTO _migrations (version, applied_at) VALUES ('003', datetime('now'))",
+            [],
+        )?;
+    }
+
+    let migration_004_applied: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM _migrations WHERE version = '004'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !migration_004_applied {
+        // Safely add enabled column to models table for existing databases.
+        let _ = conn.execute("ALTER TABLE models ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1", []);
+        conn.execute(
+            "INSERT INTO _migrations (version, applied_at) VALUES ('004', datetime('now'))",
+            [],
+        )?;
+    }
+
     Ok(())
 }
 
@@ -405,6 +482,15 @@ pub fn rename_version(conn: &Connection, version_id: &str, name: &str) -> Sqlite
     Ok(())
 }
 
+pub fn delete_version(conn: &Connection, version_id: &str) -> SqliteResult<()> {
+    conn.execute(
+        "DELETE FROM version_snapshots WHERE id = ?1",
+        params![version_id],
+    )?;
+    Ok(())
+}
+
+
 // ─── Provider Config CRUD ───────────────────────────────────────────────
 
 pub fn insert_provider_config(conn: &Connection, config: &ProviderConfig) -> SqliteResult<()> {
@@ -442,6 +528,87 @@ pub fn list_provider_configs(conn: &Connection) -> SqliteResult<Vec<ProviderConf
 pub fn delete_provider_config(conn: &Connection, id: &str) -> SqliteResult<()> {
     conn.execute("DELETE FROM provider_configs WHERE id = ?1", params![id])?;
     Ok(())
+}
+
+// ─── Model Config CRUD ──────────────────────────────────────────────────
+
+pub fn insert_model_config(conn: &Connection, config: &ModelConfig) -> SqliteResult<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO models (id, provider_type, name, use_case, icon, is_custom, enabled, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            config.id, config.provider_type, config.name, config.use_case,
+            config.icon, if config.is_custom { 1 } else { 0 },
+            if config.enabled { 1 } else { 0 },
+            config.created_at, config.updated_at
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn list_model_configs(conn: &Connection) -> SqliteResult<Vec<ModelConfig>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, provider_type, name, use_case, icon, is_custom, enabled, created_at, updated_at
+         FROM models ORDER BY name",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let is_custom_val: i32 = row.get(5)?;
+        let enabled_val: i32 = row.get(6)?;
+        Ok(ModelConfig {
+            id: row.get(0)?,
+            provider_type: row.get(1)?,
+            name: row.get(2)?,
+            use_case: row.get(3)?,
+            icon: row.get(4)?,
+            is_custom: is_custom_val != 0,
+            enabled: enabled_val != 0,
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn delete_model_config(conn: &Connection, id: &str) -> SqliteResult<()> {
+    conn.execute("DELETE FROM models WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+pub fn reset_defaults(conn: &Connection) -> SqliteResult<Vec<ModelConfig>> {
+    // Delete only non-custom models
+    conn.execute("DELETE FROM models WHERE is_custom = 0", [])?;
+
+    let defaults = vec![
+        ("openai/gpt-4o-mini", "openrouter", "GPT-4o Mini", "Fast proofreading, grammar & syntax polishing", "⚡"),
+        ("meta-llama/llama-3.3-70b-instruct", "openrouter", "Llama 3.3 70B", "General prose editing & standard revision", "🦙"),
+        ("z-ai/glm-4.5-air", "openrouter", "GLM 4.5 Air", "Creative novels, character dialogue & SEO", "🎨"),
+        ("openrouter/owl-alpha", "openrouter", "Owl Alpha", "Heavy content synthesis & professional drafts", "🦉"),
+        ("google/gemma-4-31b-it", "openrouter", "Gemma 4 31B", "Grammar review & high-accuracy translation", "💎"),
+        ("openai/gpt-oss-120b", "openrouter", "GPT-OSS 120B", "Academic papers, logic flow & structured essays", "🎓"),
+        ("deepseek/deepseek-v4-flash", "openrouter", "DeepSeek V4 Flash", "Long-form narrative & fast token translation", "🌀"),
+        
+        ("openai/gpt-oss-120b", "groq", "GPT-OSS 120B", "Academic papers, logic flow & structured essays", "🎓"),
+        ("llama-3.1-8b-instant", "groq", "Llama 3.1 8B Instant", "Ultra-fast grammar corrections & simple revisions", "⚡"),
+        ("llama-3.3-70b-versatile", "groq", "Llama 3.3 70B Versatile", "General prose editing & standard revision", "🦙"),
+        ("meta-llama/llama-4-scout-17b-16e-instruct", "groq", "Llama 4 Scout 17B (16e)", "Highly creative, nuance & character dialog", "🔍"),
+        
+        ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "nvidia", "Nemotron 3 Nano Omni", "Multi-modal reasoning & long-context text synthesis", "🧠"),
+        ("deepseek-ai/deepseek-v4-flash", "nvidia", "DeepSeek V4 Flash", "MoE optimized for ultra-fast coding & drafts", "🌀"),
+        ("deepseek-ai/deepseek-v4-pro", "nvidia", "DeepSeek V4 Pro", "High MoE scaling for heavy editorial revisions", "🚀"),
+        ("mistralai/mistral-medium-3.5-128b", "nvidia", "Mistral Medium 3.5", "High performing agentic rewrite", "🌪️"),
+        ("z-ai/glm-5.1", "nvidia", "GLM 5.1", "Flagship LLM for agentic workflows & deep reasoning", "✨"),
+        ("moonshotai/kimi-k2.6", "nvidia", "Kimi k2.6", "1T MoE long-context coding & reasoning", "🌊")
+    ];
+
+    for (id, provider_type, name, use_case, icon) in defaults {
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO models (id, provider_type, name, use_case, icon, is_custom, enabled, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, 1, datetime('now'), datetime('now'))",
+            params![id, provider_type, name, use_case, icon],
+        );
+    }
+
+    list_model_configs(conn)
 }
 
 // ─── App State ──────────────────────────────────────────────────────────

@@ -54,6 +54,7 @@ onMounted(async () => {
   window.addEventListener('wheel', handleWheel, { passive: false });
   await pagesStore.fetchPages();
   await providersStore.fetchProviders();
+  await providersStore.fetchModels();
   if (pagesStore.pages.length > 0 && !pagesStore.activePageId) {
     await pagesStore.selectPage(pagesStore.pages[0].id);
   }

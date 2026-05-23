@@ -74,8 +74,12 @@ pub async fn test_provider(
     api_key: String,
     model: String,
     endpoint: Option<String>,
+    timeout_secs: Option<u64>,
 ) -> AppResult<String> {
-    let provider = OpenRouterProvider::new(api_key, model, endpoint);
+    let mut provider = OpenRouterProvider::new(api_key, model, endpoint);
+    if let Some(t) = timeout_secs {
+        provider = provider.with_timeout(t);
+    }
     let result = provider
         .review(
             "Hello world.",
@@ -86,3 +90,68 @@ pub async fn test_provider(
         .map_err(|e| AppError::Provider(e.to_string()))?;
     Ok(format!("Connection successful. Response length: {} chars", result.len()))
 }
+
+#[tauri::command]
+pub fn list_models(state: State<'_, AppState>) -> AppResult<Vec<crate::models::ModelConfig>> {
+    let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
+    let models = db::list_model_configs(&conn)?;
+    Ok(models)
+}
+
+#[tauri::command]
+pub fn save_model_config(
+    state: State<'_, AppState>,
+    id: String,
+    provider_type: String,
+    name: String,
+    use_case: String,
+    icon: String,
+    is_custom: bool,
+    enabled: Option<bool>,
+) -> AppResult<crate::models::ModelConfig> {
+    let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
+    let now = Utc::now().to_rfc3339();
+
+    // Check if it already exists to preserve created_at and enabled
+    let existing = db::list_model_configs(&conn)?
+        .into_iter()
+        .find(|m| m.id == id);
+
+    let existing_created_at = existing
+        .as_ref()
+        .map(|m| m.created_at.clone())
+        .unwrap_or_else(|| now.clone());
+
+    let enabled_val = enabled.unwrap_or_else(|| {
+        existing.map(|m| m.enabled).unwrap_or(true)
+    });
+
+    let config = crate::models::ModelConfig {
+        id,
+        provider_type,
+        name,
+        use_case,
+        icon,
+        is_custom,
+        enabled: enabled_val,
+        created_at: existing_created_at,
+        updated_at: now,
+    };
+    db::insert_model_config(&conn, &config)?;
+    Ok(config)
+}
+
+#[tauri::command]
+pub fn delete_model_config(state: State<'_, AppState>, model_id: String) -> AppResult<()> {
+    let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
+    db::delete_model_config(&conn, &model_id)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reset_default_models(state: State<'_, AppState>) -> AppResult<Vec<crate::models::ModelConfig>> {
+    let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
+    let models = db::reset_defaults(&conn)?;
+    Ok(models)
+}
+

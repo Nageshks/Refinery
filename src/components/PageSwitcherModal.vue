@@ -125,6 +125,29 @@ const commands: CommandItem[] = [
       console.log('CommandPalette: Executing Reset Zoom.');
       appStore.resetZoom();
     }
+  },
+  {
+    id: 'toggle-zen-focus',
+    title: 'Toggle Zen Focus Mode',
+    subtitle: 'Automatically hide sidebars and headers when typing',
+    icon: '🧘',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Toggle Zen Focus.');
+      appStore.zenFocusEnabled = !appStore.zenFocusEnabled;
+      appStore.notify(`Zen Focus Mode ${appStore.zenFocusEnabled ? 'Enabled' : 'Disabled'}`, 'success');
+    }
+  },
+  {
+    id: 'toggle-sidebar',
+    title: 'Toggle Left Sidebar',
+    subtitle: 'Show or hide the navigation and drafts panel',
+    icon: '📋',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Toggle Sidebar.');
+      appStore.toggleSidebar();
+    }
   }
 ];
 

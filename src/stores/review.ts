@@ -5,6 +5,7 @@ import { clearReviewSession } from '../composables/useTauri';
 
 export const useReviewStore = defineStore('review', () => {
   const loading = ref(false);
+  const cancelled = ref(false);
   const error = ref<string | null>(null);
   const reviewResult = ref<ReviewResult | null>(null);
   const groups = ref<SuggestionGroupWithItems[]>([]);
@@ -33,5 +34,5 @@ export const useReviewStore = defineStore('review', () => {
     }
   };
 
-  return { loading, error, reviewResult, groups, preview, sessionId, setReviewResult, clearReview };
+  return { loading, cancelled, error, reviewResult, groups, preview, sessionId, setReviewResult, clearReview };
 });

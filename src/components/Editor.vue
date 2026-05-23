@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -19,6 +19,33 @@ const content = ref(pagesStore.activePage?.content || '');
 // Start autosave process automatically on content/title changes
 useAutosave(pageId, title, content);
 
+const handleKeyDown = () => {
+  if (appStore.zenFocusEnabled && !document.documentElement.classList.contains('zen-active')) {
+    document.documentElement.classList.add('zen-active');
+  }
+};
+
+const handleMouseMove = () => {
+  if (document.documentElement.classList.contains('zen-active')) {
+    document.documentElement.classList.remove('zen-active');
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('mousemove', handleMouseMove);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', handleMouseMove);
+  document.documentElement.classList.remove('zen-active');
+});
+
+watch(() => appStore.zenFocusEnabled, (val) => {
+  if (!val) {
+    document.documentElement.classList.remove('zen-active');
+  }
+});
+
 const editor = useEditor({
   content: pagesStore.activePage?.content || '',
   extensions: [
@@ -31,6 +58,10 @@ const editor = useEditor({
       class: 'tiptap',
       spellcheck: appStore.spellcheckEnabled ? 'true' : 'false',
     },
+    handleKeyDown() {
+      handleKeyDown();
+      return false; // let the editor handle the keystroke normally
+    }
   },
   onUpdate({ editor: e }) {
     content.value = e.getHTML();

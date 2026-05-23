@@ -204,6 +204,20 @@ body {
   color: var(--text-primary);
 }
 
+/* Dynamic Custom Selection Highlights */
+html[data-highlight="gold"] ::selection {
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+html[data-highlight="mint"] ::selection {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+html[data-highlight="sky"] ::selection {
+  background: rgba(14, 165, 233, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Buttons
    ═══════════════════════════════════════════════════════════════════════ */
@@ -656,4 +670,247 @@ body {
 .is-resizing .sidebar,
 .is-resizing .review-panel {
   transition: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Appearance Customizer Themes, Layouts & Zen Focus Mode
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Emerald Accent Themes ─── */
+html[data-accent="emerald"] {
+  --accent-primary: #10B981;
+  --accent-secondary: #059669;
+  --accent-muted: #34D399;
+  --accent-subtle: rgba(16, 185, 129, 0.08);
+  --accent-hover: rgba(16, 185, 129, 0.12);
+  --accent-border: rgba(16, 185, 129, 0.22);
+}
+html[data-accent="emerald"][data-theme="light"] {
+  --accent-primary: #059669;
+  --accent-secondary: #047857;
+  --accent-muted: #10B981;
+  --accent-subtle: rgba(5, 150, 105, 0.06);
+  --accent-hover: rgba(5, 150, 105, 0.09);
+  --accent-border: rgba(5, 150, 105, 0.15);
+}
+
+/* ─── Ocean Accent Themes ─── */
+html[data-accent="ocean"] {
+  --accent-primary: #0EA5E9;
+  --accent-secondary: #0284C7;
+  --accent-muted: #38BDF8;
+  --accent-subtle: rgba(14, 165, 233, 0.08);
+  --accent-hover: rgba(14, 165, 233, 0.12);
+  --accent-border: rgba(14, 165, 233, 0.22);
+}
+html[data-accent="ocean"][data-theme="light"] {
+  --accent-primary: #0284C7;
+  --accent-secondary: #0369A1;
+  --accent-muted: #0EA5E9;
+  --accent-subtle: rgba(2, 132, 199, 0.06);
+  --accent-hover: rgba(2, 132, 199, 0.09);
+  --accent-border: rgba(2, 132, 199, 0.15);
+}
+
+/* ─── Amber Accent Themes (Cozy Sepia Overrides) ─── */
+html[data-accent="amber"] {
+  --accent-primary: #F59E0B;
+  --accent-secondary: #D97706;
+  --accent-muted: #FBBF24;
+  --accent-subtle: rgba(245, 158, 11, 0.08);
+  --accent-hover: rgba(245, 158, 11, 0.12);
+  --accent-border: rgba(245, 158, 11, 0.22);
+}
+html[data-accent="amber"][data-theme="light"] {
+  --bg-primary: #F4F1EA;
+  --bg-secondary: #FAF8F5;
+  --bg-tertiary: #EAE6DC;
+  --bg-hover: #E4DEC9;
+  --bg-input: #FFFFFF;
+  --text-primary: #2B2620;
+  --text-secondary: #6B5E51;
+  --accent-primary: #D97706;
+  --accent-secondary: #B45309;
+  --accent-muted: #F59E0B;
+  --accent-subtle: rgba(217, 119, 6, 0.06);
+  --accent-hover: rgba(217, 119, 6, 0.09);
+  --accent-border: rgba(217, 119, 6, 0.15);
+}
+
+/* ─── Rose Accent Themes ─── */
+html[data-accent="rose"] {
+  --accent-primary: #EC4899;
+  --accent-secondary: #DB2777;
+  --accent-muted: #F472B6;
+  --accent-subtle: rgba(236, 72, 153, 0.08);
+  --accent-hover: rgba(236, 72, 153, 0.12);
+  --accent-border: rgba(236, 72, 153, 0.22);
+}
+html[data-accent="rose"][data-theme="light"] {
+  --accent-primary: #DB2777;
+  --accent-secondary: #C2185B;
+  --accent-muted: #EC4899;
+  --accent-subtle: rgba(219, 39, 119, 0.06);
+  --accent-hover: rgba(219, 39, 119, 0.09);
+  --accent-border: rgba(219, 39, 119, 0.15);
+}
+
+/* ─── Fonts Typography overrides on Tiptap editor ─── */
+html[data-editor-font="serif"] .tiptap {
+  font-family: 'Merriweather', 'Lora', Georgia, serif !important;
+  letter-spacing: 0.01em !important;
+  font-weight: 400 !important;
+}
+html[data-editor-font="mono"] .tiptap {
+  font-family: var(--font-mono) !important;
+  letter-spacing: -0.01em !important;
+}
+html[data-editor-font="sans"] .tiptap {
+  font-family: var(--font-sans) !important;
+}
+html[data-editor-font="slab"] .tiptap {
+  font-family: 'Courier Prime', 'Arvo', Courier, monospace !important;
+  letter-spacing: -0.01em !important;
+}
+html[data-editor-font="geometric"] .tiptap {
+  font-family: 'Outfit', 'Montserrat', sans-serif !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Apply Line Height and Font Size dynamically in editor content styling */
+.tiptap {
+  line-height: var(--editor-line-height, 1.6) !important;
+  font-size: var(--editor-font-size, 14px) !important;
+}
+
+/* ─── Canvas Background overrides (data-canvas-bg) ─── */
+html[data-canvas-bg="dracula"] {
+  --bg-primary: #191622;
+  --bg-secondary: #1F1C2C;
+  --bg-tertiary: #252236;
+  --bg-input: #1F1C2C;
+  --bg-hover: #2F2A3F;
+}
+html[data-canvas-bg="dracula"][data-theme="light"] {
+  --bg-primary: #F6F3FC;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #ECE7F7;
+  --bg-input: #FFFFFF;
+  --bg-hover: #DFD7F2;
+  --text-primary: #211B30;
+  --text-secondary: #5D5470;
+}
+
+html[data-canvas-bg="slate"] {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-tertiary: #334155;
+  --bg-input: #1E293B;
+  --bg-hover: #3E4F68;
+}
+html[data-canvas-bg="slate"][data-theme="light"] {
+  --bg-primary: #F1F5F9;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E2E8F0;
+  --bg-input: #FFFFFF;
+  --bg-hover: #CBD5E1;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+}
+
+html[data-canvas-bg="parchment"] {
+  --bg-primary: #181411;
+  --bg-secondary: #211C18;
+  --bg-tertiary: #2A2420;
+  --bg-input: #211C18;
+  --bg-hover: #3A322C;
+}
+html[data-canvas-bg="parchment"][data-theme="light"] {
+  --bg-primary: #F5EEDB;
+  --bg-secondary: #FCF8EE;
+  --bg-tertiary: #EAE1CD;
+  --bg-input: #FCF8EE;
+  --bg-hover: #DDD2B8;
+  --text-primary: #2B2118;
+  --text-secondary: #6B5541;
+}
+
+html[data-canvas-bg="contrast"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0D0D0D;
+  --bg-tertiary: #161616;
+  --bg-input: #000000;
+  --bg-hover: #262626;
+  --border-subtle: #444444;
+  --border-default: #666666;
+  --border-strong: #999999;
+}
+html[data-canvas-bg="contrast"][data-theme="light"] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8F8F8;
+  --bg-tertiary: #EEEEEE;
+  --bg-input: #FFFFFF;
+  --bg-hover: #E5E5E5;
+  --text-primary: #000000;
+  --text-secondary: #222222;
+  --border-subtle: #CCCCCC;
+  --border-default: #999999;
+  --border-strong: #000000;
+}
+
+/* ─── UI Layout Variants (data-ui-variant) ─── */
+html[data-ui-variant="unified"] .sidebar,
+html[data-ui-variant="unified"] .appbar {
+  background-color: var(--bg-primary) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+html[data-ui-variant="glassmorphic"] .sidebar,
+html[data-ui-variant="glassmorphic"] .appbar {
+  background-color: rgba(21, 24, 33, 0.7) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+html[data-ui-variant="glassmorphic"][data-theme="light"] .sidebar,
+html[data-ui-variant="glassmorphic"][data-theme="light"] .appbar {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ─── Column line-widths ─── */
+html[data-editor-width="cozy"] .tiptap {
+  max-width: 680px !important;
+  margin: 0 auto !important;
+}
+html[data-editor-width="wide"] .tiptap {
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+/* ─── Zen Focus Mode Distraction-Free animations ─── */
+html.zen-active .sidebar,
+html.zen-active .appbar,
+html.zen-active .review-panel,
+html.zen-active .sidebar-resizer,
+html.zen-active .panel-resizer {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar,
+.appbar,
+.review-panel {
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), width var(--transition-slow);
+}
+
+/* Hide all scrollbars in Zen Focus Mode for total distraction-free writing */
+html.zen-active *::-webkit-scrollbar {
+  display: none !important;
+}
+html.zen-active {
+  scrollbar-width: none !important; /* Firefox support */
 }

@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue';
 import { usePagesStore } from '../stores/pages';
 import { useAppStore } from '../stores/app';
-import { listVersions, restoreVersion, renameVersion } from '../composables/useTauri';
+import { listVersions, restoreVersion, renameVersion, deleteVersion } from '../composables/useTauri';
 import type { VersionSnapshot } from '../types';
 import VersionPreviewModal from './VersionPreviewModal.vue';
 
@@ -86,6 +86,33 @@ const onRestoreFromPreview = async (version: VersionSnapshot) => {
   await handleRestore(version);
 };
 
+// Version Snapshot Deletion
+const showDeleteModal = ref(false);
+const versionToDelete = ref<VersionSnapshot | null>(null);
+
+const handleDeleteVersion = (version: VersionSnapshot) => {
+  versionToDelete.value = version;
+  showDeleteModal.value = true;
+};
+
+const confirmDeleteVersion = async () => {
+  if (!versionToDelete.value) return;
+  const version = versionToDelete.value;
+  showDeleteModal.value = false;
+  try {
+    await deleteVersion(version.id);
+    appStore.notify('Version deleted successfully', 'success');
+    if (pagesStore.activePageId) {
+      await pagesStore.selectPage(pagesStore.activePageId);
+    }
+    await fetchVersions();
+  } catch (e) {
+    appStore.notify('Failed to delete version', 'error');
+  } finally {
+    versionToDelete.value = null;
+  }
+};
+
 const formatDate = (dateStr: string) => {
   try {
     const d = new Date(dateStr);
@@ -130,6 +157,7 @@ const formatDate = (dateStr: string) => {
                   {{ v.name || 'Version Snapshot' }}
                 </span>
                 <button class="btn-edit-icon" @click.stop="startRenameVersion(v)" title="Rename version">✏️</button>
+                <button class="btn-delete-icon" @click.stop="handleDeleteVersion(v)" title="Delete version">🗑️</button>
               </div>
               <div class="version-meta-row">
                 <span class="version-time text-xs">{{ formatDate(v.created_at) }}</span>
@@ -178,6 +206,29 @@ const formatDate = (dateStr: string) => {
             <div class="modal-footer custom-prompt-footer">
               <button class="btn btn-outline" @click="showRestoreModal = false">Cancel</button>
               <button class="btn btn-primary" @click="confirmRestore">Restore Version</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- Custom Delete Modal -->
+      <Transition name="fade">
+        <div v-if="showDeleteModal" class="modal-backdrop prompt-backdrop" @click="showDeleteModal = false">
+          <div class="modal-content prompt-modal" @click.stop>
+            <div class="prompt-accent-bar bar-delete"></div>
+            <div class="modal-header custom-prompt-header">
+              <h3 class="modal-title-custom text-error">Delete Snapshot</h3>
+              <button class="close-modal-btn" @click="showDeleteModal = false">×</button>
+            </div>
+            <div class="modal-body custom-prompt-body">
+              <p class="delete-warning-text">
+                Are you sure you want to permanently delete the snapshot <strong>"{{ versionToDelete?.name || 'Version Snapshot' }}"</strong>?
+              </p>
+              <p class="delete-sub-text">This will permanently remove this version snapshot from draft history. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer custom-prompt-footer">
+              <button class="btn btn-outline" @click="showDeleteModal = false">Cancel</button>
+              <button class="btn-danger" @click="confirmDeleteVersion">Delete Snapshot</button>
             </div>
           </div>
         </div>
@@ -509,5 +560,52 @@ const formatDate = (dateStr: string) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Version Deletion & Modal Accents */
+.btn-delete-icon {
+  background: none;
+  border: none;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  padding: 2px;
+  margin-left: 2px;
+}
+
+.version-card:hover .btn-delete-icon {
+  opacity: 0.6;
+}
+
+.btn-delete-icon:hover {
+  opacity: 1 !important;
+  color: var(--color-error);
+}
+
+.prompt-accent-bar.bar-delete {
+  background: var(--color-error);
+}
+
+.modal-title-custom.text-error {
+  color: var(--color-error, #ef4444);
+}
+
+.btn-danger {
+  background: var(--color-error, #ef4444);
+  color: #ffffff !important;
+  border: 1px solid transparent;
+  padding: 8px 16px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 </style>

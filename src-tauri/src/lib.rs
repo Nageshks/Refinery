@@ -20,6 +20,20 @@ pub fn run() {
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("failed to get app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
+
+            // Load GPU config and apply command line arguments before webview initializes
+            let config_path = app_data_dir.join("gpu-config.json");
+            if config_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&config_path) {
+                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&content) {
+                        if config.get("disable_gpu").and_then(|v| v.as_bool()).unwrap_or(false) {
+                            std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-gpu");
+                            log::info!("Hardware acceleration is DISABLED via gpu-config.json");
+                        }
+                    }
+                }
+            }
+
             let db_path = app_data_dir.join("refinery.db");
 
             let conn = db::init_db(&db_path).expect("failed to initialize database");
@@ -51,6 +65,11 @@ pub fn run() {
             commands::providers::save_provider_config,
             commands::providers::delete_provider_config,
             commands::providers::test_provider,
+            // Models
+            commands::providers::list_models,
+            commands::providers::save_model_config,
+            commands::providers::delete_model_config,
+            commands::providers::reset_default_models,
             // Compare
             commands::compare::compare_texts,
             // Versions
@@ -59,10 +78,13 @@ pub fn run() {
             commands::versions::restore_version,
             commands::versions::rename_version,
             commands::versions::create_manual_version,
+            commands::versions::delete_version,
             // Window controls (custom Rust fallback)
             commands::window::minimize_window,
             commands::window::maximize_window,
             commands::window::close_window,
+            commands::window::set_gpu_acceleration,
+            commands::window::get_gpu_acceleration,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

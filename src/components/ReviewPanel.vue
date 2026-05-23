@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { usePagesStore } from '../stores/pages';
 import { useProvidersStore } from '../stores/providers';
 import { useAppStore } from '../stores/app';
@@ -7,6 +7,7 @@ import { useReview } from '../composables/useReview';
 import { Store } from '@tauri-apps/plugin-store';
 import SuggestionItemComp from './SuggestionItem.vue';
 import { categoryLabels } from '../types';
+import { setActiveProvider } from '../composables/useTauri';
 
 const pagesStore = usePagesStore();
 const providersStore = useProvidersStore();
@@ -14,6 +15,7 @@ const appStore = useAppStore();
 const review = useReview();
 
 const isDragging = ref(false);
+const providerKeys = ref<Record<string, string>>({});
 
 const initResize = (e: MouseEvent) => {
   e.preventDefault();
@@ -43,55 +45,49 @@ const initResize = (e: MouseEvent) => {
 const showDropdown = ref(false);
 const dropdownEl = ref<HTMLElement | null>(null);
 
-interface ModelDetail {
-  id: string;
-  name: string;
-  useCase: string;
-  icon: string;
-}
-
-const openrouterModelsList: ModelDetail[] = [
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', useCase: 'Fast proofreading, grammar & syntax polishing', icon: '⚡' },
-  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', useCase: 'General prose editing & standard revision', icon: '🦙' },
-  { id: 'z-ai/glm-4.5-air', name: 'GLM 4.5 Air', useCase: 'Creative novels, character dialogue & SEO', icon: '🎨' },
-  { id: 'openrouter/owl-alpha', name: 'Owl Alpha', useCase: 'Heavy content synthesis & professional drafts', icon: '🦉' },
-  { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B', useCase: 'Grammar review & high-accuracy translation', icon: '💎' },
-  { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B', useCase: 'Academic papers, logic flow & structured essays', icon: '🎓' },
-  { id: 'deepseek/deepseek-v4-flash', name: 'DeepSeek V4 Flash', useCase: 'Long-form narrative & fast token translation', icon: '🌀' }
-];
-
-const groqModelsList: ModelDetail[] = [
-  { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B', useCase: 'Academic papers, logic flow & structured essays', icon: '🎓' },
-  { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', useCase: 'Ultra-fast grammar corrections & simple revisions', icon: '⚡' },
-  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', useCase: 'General prose editing & standard revision', icon: '🦙' },
-  { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (16e)', useCase: 'Highly creative, nuance & character dialog', icon: '🔍' }
-];
-
-const nvidiaModelsList: ModelDetail[] = [
-  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'Nemotron 3 Nano Omni', useCase: 'Multi-modal reasoning & long-context text synthesis', icon: '🧠' },
-  { id: 'deepseek-ai/deepseek-v4-flash', name: 'DeepSeek V4 Flash', useCase: 'MoE optimized for ultra-fast coding & drafts', icon: '🌀' },
-  { id: 'deepseek-ai/deepseek-v4-pro', name: 'DeepSeek V4 Pro', useCase: 'High MoE scaling for heavy editorial revisions', icon: '🚀' },
-  { id: 'mistralai/mistral-medium-3.5-128b', name: 'Mistral Medium 3.5', useCase: 'High performing agentic rewrite', icon: '🌪️' },
-  { id: 'z-ai/glm-5.1', name: 'GLM 5.1', useCase: 'Flagship LLM for agentic workflows & deep reasoning', icon: '✨' },
-  { id: 'moonshotai/kimi-k2.6', name: 'Kimi k2.6', useCase: '1T MoE long-context coding & reasoning', icon: '🌊' }
-];
-
-const modelsList = computed(() => {
-  const active = providersStore.activeProvider;
-  if (active) {
-    if (active.provider_type === 'groq') {
-      return groqModelsList;
-    } else if (active.provider_type === 'nvidia') {
-      return nvidiaModelsList;
+const loadApiKeys = async () => {
+  try {
+    const store = await Store.load('credentials.json');
+    for (const provider of providersStore.providers) {
+      const key = await store.get<string>(`apikey_${provider.id}`);
+      if (key) {
+        providerKeys.value[provider.id] = key;
+      } else {
+        providerKeys.value[provider.id] = '';
+      }
     }
+  } catch (e) {
+    console.error('Failed to load api keys in review panel:', e);
   }
-  return openrouterModelsList;
+};
+
+const groupedModelsList = computed(() => {
+  const list = providersStore.models.filter(m => m.enabled);
+  const groups: Record<string, { providerName: string; providerId: string; models: any[] }> = {};
+  for (const model of list) {
+    const provider = providersStore.providers.find(p => p.provider_type === model.provider_type);
+    if (!provider) continue;
+    const key = providerKeys.value[provider.id];
+    if (!key) continue; // Only show if token/API key is entered!
+    
+    if (!groups[model.provider_type]) {
+      groups[model.provider_type] = {
+        providerName: provider.name,
+        providerId: provider.id,
+        models: []
+      };
+    }
+    groups[model.provider_type].models.push(model);
+  }
+  return Object.values(groups);
 });
 
 const selectedModelDetail = computed(() => {
   const active = providersStore.activeProvider;
   if (!active) return null;
-  return modelsList.value.find(m => m.id === active.selected_model) || {
+  
+  // Find in all provider models
+  return providersStore.models.find(m => m.id === active.selected_model && m.provider_type === active.provider_type) || {
     id: active.selected_model,
     name: active.selected_model.split('/').pop() || active.selected_model,
     useCase: 'Custom Model',
@@ -99,21 +95,36 @@ const selectedModelDetail = computed(() => {
   };
 });
 
-const selectModel = async (modelId: string) => {
-  const active = providersStore.activeProvider;
-  if (!active) return;
+const selectModel = async (model: any) => {
   try {
+    const provider = providersStore.providers.find(p => p.provider_type === model.provider_type);
+    if (!provider) return;
+
+    // 1. Update this provider's default model and mark enabled
     await providersStore.saveProvider({
-      id: active.id,
-      name: active.name,
-      providerType: active.provider_type,
-      endpoint: active.endpoint || undefined,
-      selectedModel: modelId,
-      enabled: active.enabled
+      id: provider.id,
+      name: provider.name,
+      providerType: provider.provider_type,
+      endpoint: provider.endpoint || undefined,
+      selectedModel: model.id,
+      enabled: true
     });
-    appStore.notify(`Switched to ${selectedModelDetail.value?.name}`, 'success');
+
+    // 2. Set active in backend
+    await setActiveProvider(provider.id);
+
+    // 3. Refresh providers
+    await providersStore.fetchProviders();
+
+    appStore.notify(`Switched to ${model.name} (${provider.name})`, 'success');
+
+    // Auto-retrigger review if in review mode and session is not loaded yet
+    if (appStore.activeView === 'review' && !review.reviewResult.value) {
+      await handleReview();
+    }
   } catch (e) {
-    appStore.notify('Failed to switch model', 'error');
+    console.error('Failed to switch active model:', e);
+    appStore.notify('Failed to switch active model', 'error');
   }
   showDropdown.value = false;
 };
@@ -124,8 +135,23 @@ const closeDropdown = (e: MouseEvent) => {
   }
 };
 
-onMounted(() => {
+const triggerAutoReviewIfNeeded = async () => {
+  if (appStore.activeView === 'review') {
+    const page = pagesStore.activePage;
+    if (page && !page.last_review_session_id && !review.reviewResult.value && !review.loading.value) {
+      await handleReview();
+    }
+  }
+};
+
+watch(() => appStore.activeView, triggerAutoReviewIfNeeded);
+watch(() => pagesStore.activePageId, triggerAutoReviewIfNeeded);
+
+onMounted(async () => {
   document.addEventListener('click', closeDropdown);
+  await providersStore.fetchProviders();
+  await loadApiKeys();
+  await triggerAutoReviewIfNeeded();
 });
 
 onUnmounted(() => {
@@ -208,64 +234,113 @@ const allSuggestions = computed(() => {
       :class="['panel-resizer', { 'is-dragging': isDragging }]" 
       @mousedown="initResize"
     ></div>
-    <div class="panel-header">
-      <h3>Polishing Desk</h3>
-      <div class="flex items-center gap-2" v-if="review.groups.value.length > 0">
-        <span class="badge badge-neutral">{{ review.totalCount() }} suggestions</span>
+
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3) var(--space-4); gap: var(--space-2); min-height: 48px;">
+      <!-- Left side: Assisting Voice Switcher & Re-submit wrapper -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div v-if="providersStore.activeProvider" class="header-model-selector" ref="dropdownEl" style="position: relative;">
+          <button 
+            type="button" 
+            class="btn btn-xs btn-outline dropdown-trigger" 
+            @click.stop="showDropdown = !showDropdown"
+            :class="{ active: showDropdown }"
+            style="padding: 4px 8px; font-size: 11px; display: flex; align-items: center; gap: 4px;"
+          >
+            <span class="model-icon">{{ selectedModelDetail?.icon || '🤖' }}</span>
+            <span class="model-name" style="font-weight: 600;">{{ selectedModelDetail?.name }}</span>
+            <span class="chevron-icon" style="font-size: 8px;">▼</span>
+          </button>
+          
+          <!-- Grouped Advanced Dropdown Menu -->
+          <transition name="dropdown-fade">
+            <div v-if="showDropdown" class="dropdown-menu advanced-dropdown-menu" style="top: calc(100% + 6px); bottom: auto; left: 0; min-width: 240px; transform-origin: top left;">
+              <div class="dropdown-header-title">Select Assisting Voice</div>
+              <div class="dropdown-scroll-area">
+                <div 
+                  v-for="group in groupedModelsList" 
+                  :key="group.providerId" 
+                  class="dropdown-group"
+                >
+                  <div class="dropdown-group-header">
+                    <span class="group-header-icon">
+                      {{ group.providerId === 'openrouter' ? '🔗' : group.providerId === 'groq' ? '⚡' : '💚' }}
+                    </span>
+                    <span class="group-header-text">{{ group.providerName }}</span>
+                  </div>
+                  <button
+                    v-for="model in group.models"
+                    :key="model.id"
+                    type="button"
+                    class="dropdown-item"
+                    :class="{ selected: providersStore.activeProvider?.selected_model === model.id && providersStore.activeProvider?.provider_type === group.providerId }"
+                    @click="selectModel(model)"
+                  >
+                    <div class="item-icon-col">
+                      <span class="model-icon">{{ model.icon || '🤖' }}</span>
+                    </div>
+                    <div class="item-text-col">
+                      <div class="item-name-row">
+                        <span class="item-name">{{ model.name }}</span>
+                        <span v-if="providersStore.activeProvider?.selected_model === model.id && providersStore.activeProvider?.provider_type === group.providerId" class="selected-check">✓</span>
+                      </div>
+                      <div class="item-desc" v-if="model.use_case">{{ model.use_case }}</div>
+                    </div>
+                  </button>
+                </div>
+                
+                <div v-if="groupedModelsList.length === 0" class="dropdown-empty-state" style="padding: var(--space-4) var(--space-3); text-align: center;">
+                  <p class="text-xs text-muted" style="margin: 0; line-height: 1.4;">
+                    No API keys configured. Set them up in settings first.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
+
+        <!-- Regenerate / Re-submit Send Button -->
+        <button 
+          v-if="review.groups.value.length > 0 && !review.loading.value"
+          type="button" 
+          class="btn btn-xs btn-outline resubmit-btn" 
+          @click="handleReview"
+          title="Regenerate suggestions"
+          style="padding: 4px 6px; display: inline-flex; align-items: center; justify-content: center; height: 23px; width: 23px; border-radius: var(--radius-sm);"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Right side: Submit/Apply Changes button & Close Button -->
+      <div class="flex items-center gap-2">
+        <button 
+          v-if="review.groups.value.length > 0"
+          class="btn btn-xs btn-primary btn-submit-changes" 
+          @click="handleApply" 
+          :disabled="review.approvedCount() === 0"
+          style="padding: 4px 10px; font-size: 11px; font-weight: 600;"
+        >
+          ✓ Apply {{ review.approvedCount() }} Changes
+        </button>
+        <button 
+          class="btn btn-ghost btn-icon sm close-panel-btn" 
+          @click="handleDismissReview" 
+          title="Close Polishing"
+          style="font-size: 16px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; padding: 0; line-height: 1;"
+        >
+          ×
+        </button>
       </div>
     </div>
 
     <div class="review-body">
       <!-- No review yet -->
       <div v-if="review.groups.value.length === 0 && !review.loading.value" class="review-empty">
-        <p class="minimal-sidebar-instruction">Choose an assisting voice below to begin refining your draft.</p>
+        <p class="minimal-sidebar-instruction">Choose an assisting voice at the top to begin refining your draft.</p>
         
-        <!-- Premium Model Selector -->
-        <div v-if="providersStore.activeProvider" class="model-selector-container" ref="dropdownEl">
-          <label class="label selector-label">Assisting Voice</label>
-          <div class="custom-dropdown">
-            <button 
-              type="button" 
-              class="dropdown-trigger" 
-              @click.stop="showDropdown = !showDropdown"
-              :class="{ active: showDropdown }"
-            >
-              <div class="trigger-content" v-if="selectedModelDetail">
-                <span class="model-icon">{{ selectedModelDetail.icon }}</span>
-                <span class="model-name">{{ selectedModelDetail.name }}</span>
-              </div>
-              <span class="chevron-icon">▾</span>
-            </button>
-            
-            <transition name="dropdown-fade">
-              <div v-if="showDropdown" class="dropdown-menu">
-                <div class="dropdown-header-title">Select Assisting Voice</div>
-                <div class="dropdown-scroll-area">
-                  <button
-                    v-for="model in modelsList"
-                    :key="model.id"
-                    type="button"
-                    class="dropdown-item"
-                    :class="{ selected: providersStore.activeProvider.selected_model === model.id }"
-                    @click="selectModel(model.id)"
-                  >
-                    <div class="item-icon-col">
-                      <span class="model-icon">{{ model.icon }}</span>
-                    </div>
-                    <div class="item-text-col">
-                      <div class="item-name-row">
-                        <span class="item-name">{{ model.name }}</span>
-                        <span v-if="providersStore.activeProvider.selected_model === model.id" class="selected-check">✓</span>
-                      </div>
-                      <div class="item-desc">{{ model.useCase }}</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </transition>
-          </div>
-        </div>
-
         <button class="btn-polish-trigger" @click="handleReview" :disabled="!pagesStore.activePage">
           Begin Polishing
         </button>
@@ -273,22 +348,26 @@ const allSuggestions = computed(() => {
           {{ review.error.value }}
         </p>
       </div>
-
+ 
       <!-- Loading -->
-      <div v-else-if="review.loading.value" class="review-loading">
-        <div class="skeleton" style="height: 60px; margin-bottom: 8px;" />
-        <div class="skeleton" style="height: 80px; margin-bottom: 8px;" />
-        <div class="skeleton" style="height: 60px;" />
-        <p class="text-xs text-muted" style="text-align: center; margin-top: 12px;">Analyzing your writing...</p>
+      <div v-else-if="review.loading.value" class="review-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; padding: 24px;">
+        <div class="skeleton" style="height: 60px; width: 100%; margin-bottom: 4px;" />
+        <div class="skeleton" style="height: 80px; width: 100%; margin-bottom: 4px;" />
+        <div class="skeleton" style="height: 60px; width: 100%;" />
+        <p class="text-xs text-muted" style="text-align: center; margin-top: 4px; margin-bottom: 8px;">Analyzing your writing...</p>
+        <button class="btn btn-outline" style="width: 100%; max-width: 280px; padding: 10px;" @click="review.cancelReview()">
+          Cancel Polishing
+        </button>
       </div>
-
+ 
       <!-- Suggestions Flat List -->
       <template v-else>
-        <div class="corrections-header">
-          <h4>Corrections</h4>
-          <span class="badge badge-neutral">{{ review.totalCount() }}</span>
+        <div class="corrections-header" style="margin-bottom: 8px; padding: 0 4px;">
+          <h4 style="font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; margin: 0;">
+            Corrections ({{ review.totalCount() }})
+          </h4>
         </div>
-
+ 
         <div class="suggestions-flat-list">
           <SuggestionItemComp
             v-for="item in allSuggestions"
@@ -298,14 +377,6 @@ const allSuggestions = computed(() => {
             @approve="handleApprove"
             @reject="handleReject"
           />
-        </div>
-
-        <!-- Apply Button -->
-        <div class="review-footer">
-          <button class="btn btn-ghost" @click="handleDismissReview">Dismiss</button>
-          <button class="btn btn-primary" @click="handleApply" :disabled="review.approvedCount() === 0">
-            Apply {{ review.approvedCount() }} Changes
-          </button>
         </div>
       </template>
     </div>
@@ -418,18 +489,6 @@ const allSuggestions = computed(() => {
   background: var(--bg-hover);
   border-radius: 8px;
   color: var(--text-secondary);
-}
-
-.review-footer {
-  padding: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-shrink: 0;
-  background: var(--bg-secondary);
-  position: sticky;
-  bottom: 0;
 }
 
 /* Model Selector Custom Dropdown styles */
@@ -559,6 +618,36 @@ const allSuggestions = computed(() => {
   background: var(--accent-subtle);
 }
 
+.dropdown-group {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.dropdown-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+.dropdown-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-1) var(--space-3);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-muted);
+  letter-spacing: 0.05em;
+}
+.group-header-icon {
+  font-size: 12px;
+}
+.group-header-text {
+  opacity: 0.85;
+}
+
 .item-icon-col {
   display: flex;
   align-items: flex-start;
@@ -606,5 +695,27 @@ const allSuggestions = computed(() => {
 .dropdown-fade-leave-to {
   opacity: 0;
   transform: translateY(4px);
+}
+
+/* Re-submit Button Premium Styles */
+.resubmit-btn {
+  background: var(--bg-secondary);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+}
+
+.resubmit-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.resubmit-btn svg {
+  transition: transform var(--transition-fast);
+}
+
+.resubmit-btn:hover svg {
+  transform: translate(1px, -1px) scale(1.05);
 }
 </style>

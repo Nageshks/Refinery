@@ -78,3 +78,36 @@ pub fn create_manual_version(
 
     Ok(snapshot)
 }
+
+#[tauri::command]
+pub fn delete_version(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> AppResult<()> {
+    let conn = state.db.lock().map_err(|e| AppError::Lock(e.to_string()))?;
+    
+    let version = db::get_version(&conn, &version_id)?;
+    if let Some(v) = version {
+        // 1. Delete version from SQLite
+        db::delete_version(&conn, &version_id)?;
+        
+        // 2. Fallback pointer healing if deleted version was active
+        let page = db::get_page(&conn, &v.page_id)?;
+        if let Some(p) = page {
+            if p.current_version_id == Some(version_id.clone()) {
+                let other_versions = db::list_versions(&conn, &v.page_id)?;
+                if let Some(latest_v) = other_versions.first() {
+                    db::set_page_version(&conn, &v.page_id, &latest_v.id)?;
+                } else {
+                    conn.execute(
+                        "UPDATE pages SET current_version_id = NULL WHERE id = ?1",
+                        rusqlite::params![v.page_id],
+                    )?;
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+

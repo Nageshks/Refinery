@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useAppStore } from '../stores/app';
 import { usePagesStore } from '../stores/pages';
 import { invoke } from '@tauri-apps/api/core';
@@ -50,6 +50,34 @@ const maximizeWindow = () => {
 const closeWindow = () => {
   invoke('close_window').catch(err => console.error('Failed to close:', err));
 };
+
+// Toolbar Page Title Renaming
+const isEditingTitle = ref(false);
+const renameValue = ref('');
+const renameInputRef = ref<HTMLInputElement | null>(null);
+
+const startRename = () => {
+  if (!pagesStore.activePage) return;
+  renameValue.value = pagesStore.activePage.title;
+  isEditingTitle.value = true;
+  nextTick(() => {
+    renameInputRef.value?.focus();
+    renameInputRef.value?.select();
+  });
+};
+
+const finishRename = async () => {
+  if (!isEditingTitle.value || !pagesStore.activePageId) return;
+  const newTitle = renameValue.value.trim();
+  isEditingTitle.value = false;
+  if (!newTitle || newTitle === pagesStore.activePage?.title) return;
+  try {
+    await pagesStore.renamePage(pagesStore.activePageId, newTitle);
+    appStore.notify('Page renamed successfully', 'success');
+  } catch (e) {
+    appStore.notify('Failed to rename page', 'error');
+  }
+};
 </script>
 
 <template>
@@ -89,10 +117,29 @@ const closeWindow = () => {
       </div>
     </div>
     
-    <div class="appbar-center" data-tauri-drag-region style="cursor: default;">
-      <span v-if="pagesStore.activePage" class="page-title" data-tauri-drag-region>
-        {{ pagesStore.activePage.title }}
-      </span>
+    <div class="appbar-center" data-tauri-drag-region style="cursor: default; display: flex; align-items: center; justify-content: center; height: 100%;">
+      <template v-if="pagesStore.activePage">
+        <div v-if="isEditingTitle" style="display: flex; align-items: center;" @click.stop>
+          <input
+            ref="renameInputRef"
+            type="text"
+            class="appbar-rename-input"
+            v-model="renameValue"
+            @keyup.enter="finishRename"
+            @keyup.escape="isEditingTitle = false"
+            @blur="finishRename"
+          />
+        </div>
+        <span 
+          v-else 
+          class="page-title hover-editable" 
+          @click="startRename"
+          title="Click to rename draft"
+        >
+          {{ pagesStore.activePage.title }}
+          <span class="edit-hint-icon">✏️</span>
+        </span>
+      </template>
     </div>
     
     <nav class="appbar-right">
@@ -330,5 +377,47 @@ const closeWindow = () => {
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/* Toolbar Title Renaming Styles */
+.appbar-rename-input {
+  background: var(--bg-input);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  width: 240px;
+  height: 28px;
+  outline: none;
+  font-family: var(--font-sans);
+  text-align: center;
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.page-title.hover-editable {
+  cursor: pointer;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: all var(--transition-fast);
+}
+
+.page-title.hover-editable:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.edit-hint-icon {
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.page-title.hover-editable:hover .edit-hint-icon {
+  opacity: 0.65;
 }
 </style>

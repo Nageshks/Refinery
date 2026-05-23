@@ -22,6 +22,14 @@ impl OpenRouterProvider {
             endpoint: endpoint.unwrap_or_else(|| "https://openrouter.ai/api/v1/chat/completions".to_string()),
         }
     }
+
+    pub fn with_timeout(mut self, timeout_secs: u64) -> Self {
+        self.client = Client::builder()
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .build()
+            .unwrap_or_default();
+        self
+    }
 }
 
 #[derive(Serialize)]

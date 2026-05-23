@@ -130,3 +130,17 @@ export const categoryIcons: Record<string, string> = {
   rewrite: '🔄',
   recommendation: '💬',
 };
+
+// ─── Model Config ───────────────────────────────────────────────────────
+export interface ModelConfig {
+  id: string;
+  provider_type: string;
+  name: string;
+  use_case: string;
+  icon: string;
+  is_custom: boolean;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+

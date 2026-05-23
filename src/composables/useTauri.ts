@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   Page, ReviewResult, SuggestionGroupWithItems, PreviewResult,
-  ApplyResult, ProviderConfig, VersionSnapshot, CompareResult
+  ApplyResult, ProviderConfig, VersionSnapshot, CompareResult, ModelConfig
 } from '../types';
 
 // ─── Pages ──────────────────────────────────────────────────────────────
@@ -40,8 +40,8 @@ export const saveProviderConfig = (config: {
 }) => invoke<ProviderConfig>('save_provider_config', config);
 export const deleteProviderConfig = (providerId: string) =>
   invoke<void>('delete_provider_config', { providerId });
-export const testProvider = (apiKey: string, model: string, endpoint?: string) =>
-  invoke<string>('test_provider', { apiKey, model, endpoint });
+export const testProvider = (apiKey: string, model: string, endpoint?: string, timeoutSecs?: number) =>
+  invoke<string>('test_provider', { apiKey, model, endpoint, timeoutSecs });
 
 // ─── Compare ────────────────────────────────────────────────────────────
 export const compareTexts = (textA: string, textB: string, apiKey?: string, model?: string, endpoint?: string) =>
@@ -56,3 +56,25 @@ export const renameVersion = (versionId: string, name: string) =>
   invoke<void>('rename_version', { versionId, name });
 export const createManualVersion = (pageId: string, name: string) =>
   invoke<VersionSnapshot>('create_manual_version', { pageId, name });
+export const deleteVersion = (versionId: string) =>
+  invoke<void>('delete_version', { versionId });
+
+// ─── Models ─────────────────────────────────────────────────────────────
+export const listModels = () => invoke<ModelConfig[]>('list_models');
+export const saveModelConfig = (model: {
+  id: string;
+  providerType: string;
+  name: string;
+  useCase: string;
+  icon: string;
+  isCustom: boolean;
+  enabled?: boolean;
+}) => invoke<ModelConfig>('save_model_config', model);
+export const deleteModelConfig = (modelId: string) =>
+  invoke<void>('delete_model_config', { modelId });
+export const resetDefaultModels = () => invoke<ModelConfig[]>('reset_default_models');
+
+// ─── Window / GPU Options ───────────────────────────────────────────────
+export const setGpuAcceleration = (enabled: boolean) => invoke<void>('set_gpu_acceleration', { enabled });
+export const getGpuAcceleration = () => invoke<boolean>('get_gpu_acceleration');
+

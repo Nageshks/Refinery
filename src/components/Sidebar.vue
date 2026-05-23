@@ -95,6 +95,32 @@ const confirmDeletePage = async () => {
   }
 };
 
+const editingPageId = ref<string | null>(null);
+const renameInputVal = ref('');
+const renameInputRef = ref<HTMLInputElement | null>(null);
+
+const startRename = (id: string, currentTitle: string) => {
+  editingPageId.value = id;
+  renameInputVal.value = currentTitle;
+  nextTick(() => {
+    renameInputRef.value?.focus();
+    renameInputRef.value?.select();
+  });
+};
+
+const finishRename = async (id: string) => {
+  if (editingPageId.value !== id) return;
+  const newTitle = renameInputVal.value.trim();
+  editingPageId.value = null;
+  if (!newTitle || newTitle === pagesStore.pages.find(p => p.id === id)?.title) return;
+  try {
+    await pagesStore.renamePage(id, newTitle);
+    appStore.notify('Page renamed successfully', 'success');
+  } catch (e) {
+    appStore.notify('Failed to rename page', 'error');
+  }
+};
+
 const isDragging = ref(false);
 
 const initResize = (e: MouseEvent) => {
@@ -170,14 +196,37 @@ const initResize = (e: MouseEvent) => {
                 v-for="page in pagesStore.pages" 
                 :key="page.id" 
                 :class="['page-item', { active: page.id === pagesStore.activePageId }]"
-                @click="appStore.requestPageSwitch(page.id)"
+                @click="editingPageId !== page.id && appStore.requestPageSwitch(page.id)"
+                @dblclick="startRename(page.id, page.title)"
               >
-                <div class="page-item-left">
+                <div v-if="editingPageId === page.id" class="page-item-left" @click.stop style="width: 100%; padding-right: 8px;">
+                  <span class="page-item-icon">📄</span>
+                  <input
+                    ref="renameInputRef"
+                    type="text"
+                    class="sidebar-rename-input"
+                    v-model="renameInputVal"
+                    @keyup.enter="finishRename(page.id)"
+                    @keyup.escape="editingPageId = null"
+                    @blur="finishRename(page.id)"
+                  />
+                </div>
+                <div v-else class="page-item-left">
                   <span class="page-item-icon">📄</span>
                   <span class="page-item-title truncate">{{ page.title || 'Untitled' }}</span>
                 </div>
                 <div class="page-item-right" @click.stop>
                   <button 
+                    v-if="editingPageId !== page.id"
+                    class="btn btn-ghost btn-icon sm edit-page-btn" 
+                    @click="startRename(page.id, page.title)" 
+                    title="Rename page"
+                    style="margin-right: 4px; font-size: 10px;"
+                  >
+                    ✏️
+                  </button>
+                  <button 
+                    v-if="editingPageId !== page.id"
                     class="btn btn-ghost btn-icon sm delete-page-btn" 
                     @click="deletePage(page.id, page.title)" 
                     title="Delete page"
@@ -492,13 +541,15 @@ const initResize = (e: MouseEvent) => {
   margin-left: var(--space-2);
 }
 
-.delete-page-btn {
+.delete-page-btn,
+.edit-page-btn {
   opacity: 0;
   transition: opacity var(--transition-fast);
   color: var(--text-muted);
 }
 
-.page-item:hover .delete-page-btn {
+.page-item:hover .delete-page-btn,
+.page-item:hover .edit-page-btn {
   opacity: 0.65;
 }
 
@@ -506,6 +557,25 @@ const initResize = (e: MouseEvent) => {
   opacity: 1;
   color: var(--color-error);
   background: rgba(248, 113, 113, 0.08);
+}
+
+.page-item:hover .edit-page-btn:hover {
+  opacity: 1;
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
+}
+
+.sidebar-rename-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  outline: none;
+  height: 24px;
 }
 
 /* Sidebar Resizer */

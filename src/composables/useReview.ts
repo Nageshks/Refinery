@@ -9,17 +9,31 @@ export function useReview() {
   const doReview = async (pageId: string, apiKey: string, model: string, endpoint?: string) => {
     loading.value = true;
     error.value = null;
+    store.cancelled = false;
     try {
       const result = await startReview(pageId, apiKey, model, endpoint);
+      if (store.cancelled) {
+        return; // Discard result since it was cancelled
+      }
       store.setReviewResult(result);
       await refreshPreview(pageId);
       return result;
     } catch (e: any) {
+      if (store.cancelled) {
+        return; // Ignore error since it was cancelled
+      }
       error.value = typeof e === 'string' ? e : e.message || 'Review failed';
       throw e;
     } finally {
-      loading.value = false;
+      if (!store.cancelled) {
+        loading.value = false;
+      }
     }
+  };
+
+  const cancelReview = () => {
+    store.cancelled = true;
+    loading.value = false;
   };
 
   const toggleItemApproval = async (itemId: string, state: string) => {
@@ -117,7 +131,7 @@ export function useReview() {
 
   return {
     loading, error, reviewResult, groups, preview,
-    doReview, toggleItemApproval, toggleGroupApproval,
+    doReview, cancelReview, toggleItemApproval, toggleGroupApproval,
     refreshPreview, applyChanges, clearReview, loadReviewSession,
     approvedCount, totalCount,
   };

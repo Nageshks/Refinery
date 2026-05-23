@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import type { ViewMode } from '../types';
 import { useReviewStore } from './review';
 import { usePagesStore } from './pages';
+import { getGpuAcceleration, setGpuAcceleration } from '../composables/useTauri';
 
 export const useAppStore = defineStore('app', () => {
   const sidebarCollapsed = ref(false);
@@ -32,8 +33,93 @@ export const useAppStore = defineStore('app', () => {
   const zoomFactor = ref(Number(localStorage.getItem('refinery_zoom_factor') || '1.0'));
   const spellcheckEnabled = ref(localStorage.getItem('refinery_spellcheck') === 'true');
 
+  // Extended Appearance Controls
+  const accentColor = ref<'purple' | 'emerald' | 'ocean' | 'amber' | 'rose'>((localStorage.getItem('refinery_accent_color') as any) || 'purple');
+  const highlightColor = ref<'purple' | 'gold' | 'mint' | 'sky'>((localStorage.getItem('refinery_highlight_color') as any) || 'purple');
+  const editorWidth = ref<'cozy' | 'wide'>((localStorage.getItem('refinery_editor_width') as any) || 'cozy');
+  const editorFont = ref<'sans' | 'serif' | 'mono' | 'slab' | 'geometric'>((localStorage.getItem('refinery_editor_font') as any) || 'sans');
+  const lineHeight = ref(Number(localStorage.getItem('refinery_line_height') || '1.6'));
+  const zenFocusEnabled = ref(localStorage.getItem('refinery_zen_focus') === 'true');
+  const gpuAccelerationEnabled = ref(true);
+
+  // New Personalization & Accessibility Controls
+  const canvasBg = ref<'default' | 'dracula' | 'slate' | 'parchment' | 'contrast'>((localStorage.getItem('refinery_canvas_bg') as any) || 'default');
+  const uiLayoutVariant = ref<'unified' | 'contrasted' | 'glassmorphic'>((localStorage.getItem('refinery_ui_layout_variant') as any) || 'contrasted');
+  const editorFontSize = ref(Number(localStorage.getItem('refinery_editor_font_size') || '14'));
+
+  // Load initial GPU state from Rust
+  getGpuAcceleration().then((enabled) => {
+    gpuAccelerationEnabled.value = enabled;
+  }).catch((err) => {
+    console.error('Failed to get GPU settings:', err);
+  });
+
+  watch(gpuAccelerationEnabled, (val) => {
+    setGpuAcceleration(val).catch((err) => {
+      console.error('Failed to set GPU settings:', err);
+    });
+  });
+
   watch(spellcheckEnabled, (val) => {
     localStorage.setItem('refinery_spellcheck', val ? 'true' : 'false');
+  });
+
+  const applyThemeOverrides = () => {
+    const root = document.documentElement;
+    root.setAttribute('data-accent', accentColor.value);
+    root.setAttribute('data-highlight', highlightColor.value);
+    root.setAttribute('data-editor-width', editorWidth.value);
+    root.setAttribute('data-editor-font', editorFont.value);
+    root.setAttribute('data-canvas-bg', canvasBg.value);
+    root.setAttribute('data-ui-variant', uiLayoutVariant.value);
+    root.setAttribute('data-zen-focus', zenFocusEnabled.value.toString());
+    root.style.setProperty('--editor-line-height', lineHeight.value.toString());
+    root.style.setProperty('--editor-font-size', `${editorFontSize.value}px`);
+  };
+
+  watch(accentColor, (val) => {
+    localStorage.setItem('refinery_accent_color', val);
+    applyThemeOverrides();
+  });
+
+  watch(highlightColor, (val) => {
+    localStorage.setItem('refinery_highlight_color', val);
+    applyThemeOverrides();
+  });
+
+  watch(editorWidth, (val) => {
+    localStorage.setItem('refinery_editor_width', val);
+    applyThemeOverrides();
+  });
+
+  watch(editorFont, (val) => {
+    localStorage.setItem('refinery_editor_font', val);
+    applyThemeOverrides();
+  });
+
+  watch(lineHeight, (val) => {
+    localStorage.setItem('refinery_line_height', val.toString());
+    applyThemeOverrides();
+  });
+
+  watch(zenFocusEnabled, (val) => {
+    localStorage.setItem('refinery_zen_focus', val ? 'true' : 'false');
+    applyThemeOverrides();
+  });
+
+  watch(canvasBg, (val) => {
+    localStorage.setItem('refinery_canvas_bg', val);
+    applyThemeOverrides();
+  });
+
+  watch(uiLayoutVariant, (val) => {
+    localStorage.setItem('refinery_ui_layout_variant', val);
+    applyThemeOverrides();
+  });
+
+  watch(editorFontSize, (val) => {
+    localStorage.setItem('refinery_editor_font_size', val.toString());
+    applyThemeOverrides();
   });
 
   const applyZoom = () => {
@@ -72,6 +158,7 @@ export const useAppStore = defineStore('app', () => {
   // Call once on init
   applyTheme();
   applyZoom();
+  applyThemeOverrides();
 
   const toggleSidebar = () => { sidebarCollapsed.value = !sidebarCollapsed.value; };
   const setView = (view: ViewMode) => { activeView.value = view; };
@@ -178,6 +265,16 @@ export const useAppStore = defineStore('app', () => {
     theme,
     zoomFactor,
     spellcheckEnabled,
+    accentColor,
+    highlightColor,
+    editorWidth,
+    editorFont,
+    lineHeight,
+    zenFocusEnabled,
+    gpuAccelerationEnabled,
+    canvasBg,
+    uiLayoutVariant,
+    editorFontSize,
     showDiscardReviewModal,
     pendingPageSwitchId,
     pendingViewSwitch,
@@ -190,6 +287,7 @@ export const useAppStore = defineStore('app', () => {
     doPageSwitch,
     notify,
     applyTheme,
+    applyThemeOverrides,
     zoomIn,
     zoomOut,
     resetZoom,

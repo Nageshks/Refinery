@@ -10,7 +10,7 @@ import { categoryIcons, categoryLabels } from '../types';
 
 const pagesStore = usePagesStore();
 const review = useReview();
-const { preview, loading } = review;
+const { preview } = review;
 const providersStore = useProvidersStore();
 const appStore = useAppStore();
 
@@ -44,7 +44,7 @@ const processedHighlightedContent = computed(() => {
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  const highlights = doc.querySelectorAll('.preview-highlight-inserted');
+  const highlights = doc.querySelectorAll('.preview-highlight-inserted, .preview-highlight-original');
 
   highlights.forEach(el => {
     const id = el.getAttribute('data-suggestion-id');
@@ -292,41 +292,16 @@ onUnmounted(() => {
   <div class="split-review-container flex-col">
     <!-- Review Panes Area -->
     <div class="review-panes-area">
-      <!-- Editing View Column -->
+      <!-- Editing View Column (Always shows user text with highlights layered dynamically) -->
       <div class="split-column right-column">
-        <!-- Loading State -->
-        <div v-if="loading" class="pane-scroll-area flex flex-col justify-between" style="padding: var(--space-6);">
-          <div class="skeleton-content">
-            <div class="skeleton" style="height: 32px; width: 60%; margin-bottom: var(--space-4);" />
-            <div class="skeleton" style="height: 18px; width: 90%; margin-bottom: var(--space-2);" />
-            <div class="skeleton" style="height: 18px; width: 85%; margin-bottom: var(--space-2);" />
-            <div class="skeleton" style="height: 18px; width: 88%; margin-bottom: var(--space-4);" />
-            
-            <div class="skeleton" style="height: 24px; width: 40%; margin-bottom: var(--space-4);" />
-            <div class="skeleton" style="height: 18px; width: 92%; margin-bottom: var(--space-2);" />
-            <div class="skeleton" style="height: 18px; width: 75%;" />
-          </div>
-          <div class="text-xs text-muted" style="text-align: center;">Preparing your live interactive diff preview...</div>
-        </div>
-
-        <!-- Empty suggestions state -->
-        <div v-else-if="review.groups.value.length === 0" class="pane-scroll-area empty-review-split">
-          <div class="minimalist-empty-state">
-            <h3>Polished suggestions will appear inline with warm, interactive highlights.</h3>
-            <p class="minimal-hint">Click <strong>"Begin Polishing"</strong> in the sidebar to start.</p>
-          </div>
-        </div>
-
-        <!-- Content State -->
         <div 
-          v-else
           ref="rightPane" 
           class="pane-scroll-area" 
         >
           <div 
             class="tiptap pane-content preview-content-interactive"
             @click="handlePreviewClick"
-            v-html="processedHighlightedContent || preview?.preview_content || pagesStore.activePage?.content || ''"
+            v-html="processedHighlightedContent || pagesStore.activePage?.content || ''"
           ></div>
         </div>
       </div>

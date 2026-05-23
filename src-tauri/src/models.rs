@@ -84,6 +84,22 @@ pub struct ProviderConfig {
     pub updated_at: String,
 }
 
+// ─── ModelConfig ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelConfig {
+    pub id: String,
+    pub provider_type: String,
+    pub name: String,
+    pub use_case: String,
+    pub icon: String,
+    pub is_custom: bool,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+
 // ─── AI Response Parsing ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -98,27 +98,14 @@ const formattedDiffs = computed(() => {
 </script>
 
 <template>
-  <div :class="['suggestion-card-minimal', `state-${item.approval_state}`]" :data-suggestion-card-id="item.id">
+  <div 
+    :class="['suggestion-card-minimal', `state-${item.approval_state}`]" 
+    :data-suggestion-card-id="item.id"
+    @click="emit('approve', item.id)"
+  >
     <div class="card-meta-row">
       <span class="category-pill-label">{{ categoryLabel }}</span>
-      <div class="suggestion-actions">
-        <button
-          type="button"
-          :class="['btn-action btn-approve', { active: item.approval_state === 'approved' }]"
-          @click="emit('approve', item.id)"
-          title="Approve change"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <button
-          type="button"
-          :class="['btn-action btn-reject', { active: item.approval_state === 'rejected' }]"
-          @click="emit('reject', item.id)"
-          title="Reject change"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
+      <span v-if="item.approval_state === 'approved'" class="approved-badge-tick">✓ Approved</span>
     </div>
 
     <div class="card-body-row">
@@ -147,6 +134,8 @@ const formattedDiffs = computed(() => {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   width: 100%;
+  cursor: pointer;
+  user-select: none;
 }
 
 .suggestion-card-minimal:hover {
@@ -155,10 +144,21 @@ const formattedDiffs = computed(() => {
   box-shadow: var(--shadow-md);
 }
 
+.suggestion-card-minimal:active {
+  transform: scale(0.985);
+  transition: transform var(--transition-fast);
+}
+
 /* State Styling */
 .suggestion-card-minimal.state-approved {
-  background: rgba(52, 211, 153, 0.03);
-  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(16, 185, 129, 0.04);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15), var(--shadow-sm);
+}
+.suggestion-card-minimal.state-approved:hover {
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25), var(--shadow-md);
 }
 .suggestion-card-minimal.state-rejected {
   opacity: 0.45;
@@ -166,8 +166,14 @@ const formattedDiffs = computed(() => {
   border-color: var(--border-subtle);
 }
 html[data-theme="light"] .suggestion-card-minimal.state-approved {
-  background: rgba(5, 150, 105, 0.035);
-  border-color: rgba(5, 150, 105, 0.25);
+  background: rgba(5, 150, 105, 0.04);
+  border-color: rgba(5, 150, 105, 0.3);
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.1), var(--shadow-sm);
+}
+html[data-theme="light"] .suggestion-card-minimal.state-approved:hover {
+  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.45);
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2), var(--shadow-md);
 }
 
 /* Meta row */
@@ -186,52 +192,36 @@ html[data-theme="light"] .suggestion-card-minimal.state-approved {
   letter-spacing: 0.06em;
 }
 
-/* Actions styling */
-.suggestion-actions {
-  display: flex;
-  gap: 6px;
-  opacity: 0.35;
-  transition: opacity var(--transition-fast);
-}
-
-.suggestion-card-minimal:hover .suggestion-actions {
-  opacity: 1;
-}
-
-.btn-action {
-  width: 22px;
-  height: 22px;
+/* Approved Badge Styling */
+.approved-badge-tick {
+  font-size: 9px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  outline: none;
-  padding: 0;
+  gap: 2px;
+  animation: badge-pulse 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.btn-action:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
+html[data-theme="light"] .approved-badge-tick {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.08);
 }
 
-.btn-approve:hover,
-.btn-approve.active {
-  background: var(--color-success-bg) !important;
-  border-color: var(--color-success-border) !important;
-  color: var(--color-success) !important;
-}
-
-.btn-reject:hover,
-.btn-reject.active {
-  background: var(--color-error-bg) !important;
-  border-color: var(--color-error-border) !important;
-  color: var(--color-error) !important;
+@keyframes badge-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Body row for inline comparisons */

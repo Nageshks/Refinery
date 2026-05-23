@@ -141,31 +141,11 @@ pub fn compute_preview(
     let approved_items = db::get_approved_items_for_session(&conn, &session_id)?;
     let all_items = db::get_all_items_for_session(&conn, &session_id)?;
 
-    // Filter out rejected suggestions and resolve overlaps/conflicts so we don't crash apply_patches_highlighted
-    let non_rejected_items: Vec<SuggestionItem> = all_items.iter()
-        .filter(|item| item.approval_state != "rejected")
-        .cloned()
-        .collect();
-
-    let mut proposed_highlight_items: Vec<SuggestionItem> = Vec::new();
-    for item in non_rejected_items {
-        let mut conflicts = false;
-        for existing in &proposed_highlight_items {
-            if item.span_start < existing.span_end && existing.span_start < item.span_end {
-                conflicts = true;
-                break;
-            }
-        }
-        if !conflicts {
-            proposed_highlight_items.push(item);
-        }
-    }
-
     let preview_content = patch::compute_preview(&page.content, &approved_items)
         .map_err(|e| AppError::Patch(e))?;
 
-    // Now highlighted_content will contain all non-rejected, conflict-free items applied and wrapped in spans
-    let highlighted_content = patch::apply_patches_highlighted(&page.content, &proposed_highlight_items)
+    // Now highlighted_content will contain the new hybrid editorial preview: pending items show highlighted original text, approved items show replacement text
+    let highlighted_content = patch::compute_editorial_preview(&page.content, &all_items)
         .map_err(|e| AppError::Patch(e))?;
 
     // Filter out overlapping items for original highlights as well, keeping the first suggestion in case of duplicates/alternatives to prevent index shift / mismatch errors
