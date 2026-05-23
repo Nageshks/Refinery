@@ -914,3 +914,11 @@ html.zen-active *::-webkit-scrollbar {
 html.zen-active {
   scrollbar-width: none !important; /* Firefox support */
 }
+
+/* ─── App Bar Hiding Override ─── */
+html[data-appbar-hidden="true"] {
+  --appbar-height: 0px !important;
+}
+html[data-appbar-hidden="true"] .appbar {
+  display: none !important;
+}

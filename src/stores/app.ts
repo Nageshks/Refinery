@@ -46,6 +46,7 @@ export const useAppStore = defineStore('app', () => {
   const canvasBg = ref<'default' | 'dracula' | 'slate' | 'parchment' | 'contrast'>((localStorage.getItem('refinery_canvas_bg') as any) || 'default');
   const uiLayoutVariant = ref<'unified' | 'contrasted' | 'glassmorphic'>((localStorage.getItem('refinery_ui_layout_variant') as any) || 'contrasted');
   const editorFontSize = ref(Number(localStorage.getItem('refinery_editor_font_size') || '14'));
+  const appbarHidden = ref(localStorage.getItem('refinery_appbar_hidden') === 'true');
 
   // Load initial GPU state from Rust
   getGpuAcceleration().then((enabled) => {
@@ -73,6 +74,7 @@ export const useAppStore = defineStore('app', () => {
     root.setAttribute('data-canvas-bg', canvasBg.value);
     root.setAttribute('data-ui-variant', uiLayoutVariant.value);
     root.setAttribute('data-zen-focus', zenFocusEnabled.value.toString());
+    root.setAttribute('data-appbar-hidden', appbarHidden.value.toString());
     root.style.setProperty('--editor-line-height', lineHeight.value.toString());
     root.style.setProperty('--editor-font-size', `${editorFontSize.value}px`);
   };
@@ -119,6 +121,11 @@ export const useAppStore = defineStore('app', () => {
 
   watch(editorFontSize, (val) => {
     localStorage.setItem('refinery_editor_font_size', val.toString());
+    applyThemeOverrides();
+  });
+
+  watch(appbarHidden, (val) => {
+    localStorage.setItem('refinery_appbar_hidden', val ? 'true' : 'false');
     applyThemeOverrides();
   });
 
@@ -275,6 +282,7 @@ export const useAppStore = defineStore('app', () => {
     canvasBg,
     uiLayoutVariant,
     editorFontSize,
+    appbarHidden,
     showDiscardReviewModal,
     pendingPageSwitchId,
     pendingViewSwitch,

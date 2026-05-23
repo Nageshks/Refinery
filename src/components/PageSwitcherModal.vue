@@ -148,6 +148,40 @@ const commands: CommandItem[] = [
       console.log('CommandPalette: Executing Toggle Sidebar.');
       appStore.toggleSidebar();
     }
+  },
+  {
+    id: 'toggle-appbar',
+    title: 'Toggle Title/App Bar',
+    subtitle: 'Show or hide the top menu and window action bar',
+    icon: '🖥️',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Toggle App Bar.');
+      appStore.appbarHidden = !appStore.appbarHidden;
+      appStore.notify(`App bar ${appStore.appbarHidden ? 'Hidden' : 'Visible'}`, 'success');
+    }
+  },
+  {
+    id: 'switch-to-polish',
+    title: 'Switch to Polish Mode',
+    subtitle: 'Access AI feedback, grammar polish, and edit history side-by-side',
+    icon: '✨',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Switch to Polish Mode.');
+      appStore.requestViewSwitch('review');
+    }
+  },
+  {
+    id: 'switch-to-think',
+    title: 'Switch to Think Mode',
+    subtitle: 'Immerse in clean, distraction-free markdown editing',
+    icon: '✍️',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Switch to Think Mode.');
+      appStore.requestViewSwitch('edit');
+    }
   }
 ];
 
