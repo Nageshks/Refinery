@@ -143,21 +143,6 @@ const finishRename = async () => {
     </div>
     
     <nav class="appbar-right">
-      <div class="view-tabs">
-        <button
-          :class="['tab-btn', { active: appStore.activeView === 'edit' }]"
-          @click="appStore.requestViewSwitch('edit')"
-        >
-          Think
-        </button>
-        <button
-          :class="['tab-btn', { active: appStore.activeView === 'review' }]"
-          @click="appStore.requestViewSwitch('review')"
-        >
-          Polish
-        </button>
-      </div>
-      
       <div class="window-controls">
         <button class="window-btn minimize-btn" @click="minimizeWindow" title="Minimize">
           <svg width="10" height="1" viewBox="0 0 10 1"><path d="M0,0 L10,0" stroke="currentColor" stroke-width="1.5"/></svg>

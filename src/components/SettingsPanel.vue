@@ -529,21 +529,21 @@ const selectPageTypeForEdit = (id: string) => {
 const saveEditingPageType = async () => {
   if (!editingPageType.value) return;
   if (!editingPageType.value.name.trim()) {
-    appStore.notify('Page Type name is required', 'error');
+    appStore.notify('Auditor name is required', 'error');
     return;
   }
 
   try {
     if (selectedPageTypeId.value === 'new') {
       await auditStore.addPageType(editingPageType.value);
-      appStore.notify('Page Type created successfully', 'success');
+      appStore.notify('Auditor created successfully', 'success');
     } else {
       await auditStore.updatePageType(editingPageType.value);
-      appStore.notify('Page Type updated successfully', 'success');
+      appStore.notify('Auditor updated successfully', 'success');
     }
     cancelEditingPageType();
   } catch (err) {
-    appStore.notify('Failed to save Page Type', 'error');
+    appStore.notify('Failed to save Auditor', 'error');
   }
 };
 
@@ -558,19 +558,19 @@ const cancelEditingPageType = () => {
 
 const deletePageType = (id: string) => {
   if (id === 'default') {
-    appStore.notify('Cannot delete the default page type', 'error');
+    appStore.notify('Cannot delete the default Auditor', 'error');
     return;
   }
 
   triggerConfirmation(
-    'Delete Page Type',
-    'Are you sure you want to delete this Page Type? Documents assigned to it will fallback to General Document.',
+    'Delete Auditor',
+    'Are you sure you want to delete this Auditor? Drafts assigned to it will fallback to General Auditor.',
     async () => {
       try {
         await auditStore.deletePageType(id);
-        appStore.notify('Page Type deleted successfully', 'success');
+        appStore.notify('Auditor deleted successfully', 'success');
       } catch (err) {
-        appStore.notify('Failed to delete Page Type', 'error');
+        appStore.notify('Failed to delete Auditor', 'error');
       }
     }
   );
@@ -671,7 +671,7 @@ const cancelEditingCheck = () => {
           :class="['settings-tab', { active: currentTab === 'page_types' }]"
           @click="currentTab = 'page_types'"
         >
-          <span class="tab-icon">📝</span> Page Types
+          <span class="tab-icon">🕵️‍♂️</span> Auditors
         </button>
       </div>
 
@@ -1311,17 +1311,17 @@ const cancelEditingCheck = () => {
           </div>
         </div>
 
-        <!-- Page Types Settings Tab -->
+        <!-- Auditors Settings Tab -->
         <div v-else-if="currentTab === 'page_types'" class="settings-tab-content page-types-tab-view">
           <!-- List Mode -->
           <div v-if="!editingPageType" class="page-types-list-layout">
             <div class="editor-header-area list-header-area">
               <div class="editor-header-title-block">
-                <h3 class="editor-title">Document Blueprints</h3>
-                <p class="editor-desc">Define custom page types with specific AI-driven audit instructions and parameters.</p>
+                <h3 class="editor-title">Auditors</h3>
+                <p class="editor-desc">Define custom Auditors with specific AI-driven audit instructions and parameters.</p>
               </div>
               <button class="btn btn-primary btn-create-blueprint" @click="selectPageTypeForEdit('new')">
-                ✨ Create Page Type
+                ✨ Create Auditor
               </button>
             </div>
 
@@ -1336,11 +1336,14 @@ const cancelEditingCheck = () => {
                   <div class="blueprint-title flex items-center gap-3">
                     <span class="blueprint-icon">{{ pt.icon || '📄' }}</span>
                     <div>
-                      <h4 class="blueprint-name">{{ pt.name }}</h4>
+                      <div class="flex items-center gap-2" style="flex-wrap: wrap; margin-bottom: 2px;">
+                        <h4 class="blueprint-name">{{ pt.name }}</h4>
+                        <span v-if="pt.id === 'default'" class="system-default-tag">SYSTEM DEFAULT</span>
+                      </div>
                       <span class="blueprint-id-badge">ID: {{ pt.id }}</span>
                     </div>
                   </div>
-                  <div class="blueprint-badge" :class="{ 'badge-accent': pt.id !== 'default', 'badge-neutral': pt.id === 'default' }">
+                  <div class="blueprint-badge">
                     {{ pt.checks.length }} parameters
                   </div>
                 </div>
@@ -1355,7 +1358,7 @@ const cancelEditingCheck = () => {
                       + {{ pt.checks.length - 3 }} more parameters
                     </div>
                     <div v-if="pt.inheritDefault && pt.id !== 'default'" class="blueprint-inheritance-note">
-                      🔗 Inherits General Document parameters
+                      🔗 Inherits General Auditor parameters
                     </div>
                   </div>
                 </div>
@@ -1365,7 +1368,7 @@ const cancelEditingCheck = () => {
                     class="btn btn-sm btn-outline btn-blueprint-action" 
                     @click="selectPageTypeForEdit(pt.id)"
                   >
-                    ✏️ Edit Blueprint
+                    ✏️ Edit Auditor
                   </button>
                   <button 
                     v-if="pt.id !== 'default'"
@@ -1382,14 +1385,14 @@ const cancelEditingCheck = () => {
           <!-- Editor Mode -->
           <div v-else class="page-types-editor-layout">
             <div class="editor-header-area">
-              <button class="btn btn-ghost btn-icon btn-sm btn-back" @click="cancelEditingPageType">
-                ← Back
+              <button class="btn-back" @click="cancelEditingPageType">
+                <span class="back-arrow">←</span> Back
               </button>
               <div class="editor-header-title-block">
                 <h3 class="editor-title">
-                  {{ selectedPageTypeId === 'new' ? 'New Page Blueprint' : `Edit Blueprint: ${editingPageType.name}` }}
+                  {{ selectedPageTypeId === 'new' ? 'New Auditor' : `Edit Auditor: ${editingPageType.name}` }}
                 </h3>
-                <p class="editor-desc">Configure the name, icon, and specific audit rules for this page type.</p>
+                <p class="editor-desc">Configure the name, icon, and specific audit rules for this Auditor.</p>
               </div>
             </div>
 
@@ -1397,15 +1400,15 @@ const cancelEditingCheck = () => {
               <!-- Sidebar Info Card -->
               <div class="editor-sidebar-column">
                 <div class="card appearance-card">
-                  <h4 class="card-section-title">Blueprint Identity</h4>
+                  <h4 class="card-section-title">Auditor Identity</h4>
                   
                   <div class="form-field" style="margin-bottom: var(--space-4);">
-                    <label class="label">Blueprint Name</label>
+                    <label class="label">Auditor Name</label>
                     <input 
                       type="text" 
                       class="input" 
                       v-model="editingPageType.name" 
-                      placeholder="e.g. Blog Post, Newsletter" 
+                      placeholder="e.g. SEO Auditor, Concision Expert" 
                     />
                   </div>
 
@@ -1415,7 +1418,7 @@ const cancelEditingCheck = () => {
                       type="text" 
                       class="input" 
                       v-model="editingPageType.icon" 
-                      placeholder="e.g. 📝, ✉️, 📢" 
+                      placeholder="e.g. 🕵️‍♂️, 📝, ⚡" 
                       style="width: 80px; text-align: center; font-size: 1.5rem;"
                     />
                   </div>
@@ -1423,7 +1426,7 @@ const cancelEditingCheck = () => {
                   <div v-if="editingPageType.id !== 'default'" class="setting-item flex-between" style="padding-top: var(--space-2); flex-direction: row; display: flex; align-items: center; justify-content: space-between;">
                     <div>
                       <h5 class="setting-label">Inherit Defaults</h5>
-                      <p class="setting-desc">Run General Document checks in addition to custom ones.</p>
+                      <p class="setting-desc">Run General Auditor checks in addition to custom ones.</p>
                     </div>
                     <label class="switch-container">
                       <input type="checkbox" v-model="editingPageType.inheritDefault" class="switch-input" />
@@ -1434,7 +1437,7 @@ const cancelEditingCheck = () => {
 
                 <div class="editor-sidebar-actions" style="margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);">
                   <button class="btn btn-primary" @click="saveEditingPageType" style="width: 100%;">
-                    💾 Save Page Blueprint
+                    💾 Save Auditor
                   </button>
                   <button class="btn btn-outline" @click="cancelEditingPageType" style="width: 100%;">
                     Discard Changes
@@ -1455,7 +1458,7 @@ const cancelEditingCheck = () => {
                     <div v-if="editingPageType.checks.length === 0" class="checklist-empty-state">
                       <div class="empty-icon">📌</div>
                       <h5 class="empty-title">No parameters defined yet</h5>
-                      <p class="empty-desc">Add at least one audit parameter below to configure how the AI analyzes this page type.</p>
+                      <p class="empty-desc">Add at least one audit parameter below to configure how this Auditor analyzes drafts.</p>
                     </div>
                     <div v-else class="checklist-items">
                       <div v-for="(chk, idx) in editingPageType.checks" :key="chk.id" :class="['checklist-item-card', chk.widgetType]">
@@ -1526,7 +1529,7 @@ const cancelEditingCheck = () => {
                   <div v-if="editingPageType.inheritDefault && editingPageType.id !== 'default'" class="checklist-inheritance-banner">
                     <span class="inheritance-icon">🔗</span>
                     <div>
-                      <h6 class="inheritance-title">Inheriting Parameters from General Document:</h6>
+                      <h6 class="inheritance-title">Inheriting Parameters from General Auditor:</h6>
                       <p class="text-xs text-secondary inheritance-desc">
                         Tone Consistency (Yes/No), Clarity & Concision (1-5 Scale), Core Takeaway (AI Text Match). These will run automatically.
                       </p>
@@ -1568,7 +1571,7 @@ const cancelEditingCheck = () => {
                     </div>
 
                     <button class="btn btn-outline btn-add-param" @click="addCheckToEditing">
-                      ➕ Add Parameter to Blueprint
+                      ➕ Add Parameter to Auditor Profile
                     </button>
                   </div>
                 </div>
@@ -1654,7 +1657,7 @@ const cancelEditingCheck = () => {
 
 <style scoped>
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
-.modal-content { background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); width: 95vw; max-width: 980px; height: 85vh; max-height: 720px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-xl); }
+.modal-content { background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); width: 96vw; max-width: 1400px; height: 90vh; max-height: 900px; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-xl); }
 .modal-header { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--bg-secondary); }
 .modal-body { flex: 1; overflow-y: auto; padding: 0; }
 
@@ -2695,17 +2698,19 @@ html[data-theme="light"] .theme-btn:hover {
   background: linear-gradient(135deg, var(--bg-secondary), rgba(139, 92, 246, 0.02));
 }
 .blueprint-card.is-default::before {
-  content: 'SYSTEM DEFAULT';
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-size: 8px;
+  display: none;
+}
+.system-default-tag {
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--accent-primary);
-  background: var(--accent-subtle);
+  letter-spacing: 0.03em;
+  color: var(--accent-primary, #8b5cf6);
+  background: var(--accent-subtle, rgba(139, 92, 246, 0.1));
   padding: 2px 6px;
   border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
 .blueprint-icon {
   font-size: 1.8rem;
@@ -2721,10 +2726,15 @@ html[data-theme="light"] .theme-btn:hover {
   color: var(--text-muted);
 }
 .blueprint-badge {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  display: inline-flex;
+  align-items: center;
 }
 .blueprint-card-body {
   margin: var(--space-4) 0;
@@ -2885,17 +2895,19 @@ html[data-theme="light"] .theme-btn:hover {
   background: linear-gradient(135deg, var(--bg-secondary), rgba(139, 92, 246, 0.02));
 }
 .blueprint-card.is-default::before {
-  content: 'SYSTEM DEFAULT';
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-size: 8px;
+  display: none;
+}
+.system-default-tag {
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--accent-primary);
-  background: var(--accent-subtle);
+  letter-spacing: 0.03em;
+  color: var(--accent-primary, #8b5cf6);
+  background: var(--accent-subtle, rgba(139, 92, 246, 0.1));
   padding: 2px 6px;
   border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
 .blueprint-icon {
   font-size: 1.8rem;
@@ -2911,10 +2923,15 @@ html[data-theme="light"] .theme-btn:hover {
   color: var(--text-muted);
 }
 .blueprint-badge {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  display: inline-flex;
+  align-items: center;
 }
 .blueprint-card-body {
   margin: var(--space-4) 0;
@@ -3024,11 +3041,20 @@ html[data-theme="light"] .theme-btn:hover {
   display: inline-flex;
   align-items: center;
   height: 32px;
+  gap: 6px;
+  cursor: pointer;
 }
 .btn-back:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
   border-color: var(--border-strong);
+}
+.btn-back .back-arrow {
+  transition: transform var(--transition-fast, 0.15s) ease;
+  font-size: 1.1em;
+}
+.btn-back:hover .back-arrow {
+  transform: translateX(-2.5px);
 }
 .editor-header-title-block .editor-title {
   font-size: var(--font-size-md);

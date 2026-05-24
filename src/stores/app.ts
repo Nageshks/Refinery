@@ -193,6 +193,41 @@ export const useAppStore = defineStore('app', () => {
     }
   };
 
+  const toggleAuditorPanel = () => {
+    if (auditPanelVisible.value) {
+      auditPanelVisible.value = false;
+      notify('Auditor Panel Hidden', 'success');
+    } else {
+      if (activeView.value === 'review') {
+        requestViewSwitch('edit');
+        const unwatch = watch(activeView, (newView) => {
+          if (newView === 'edit') {
+            auditPanelVisible.value = true;
+            notify('Auditor Panel Visible', 'success');
+            unwatch();
+          }
+        });
+        watch(showDiscardReviewModal, (isOpen) => {
+          if (!isOpen && activeView.value === 'review') {
+            unwatch();
+          }
+        });
+      } else {
+        auditPanelVisible.value = true;
+        notify('Auditor Panel Visible', 'success');
+      }
+    }
+  };
+
+  const togglePolishPanel = () => {
+    if (activeView.value === 'review') {
+      requestViewSwitch('edit');
+    } else {
+      auditPanelVisible.value = false;
+      requestViewSwitch('review');
+    }
+  };
+
   const doPageSwitch = async (id: string) => {
     const pagesStore = usePagesStore();
     const reviewStore = useReviewStore();
@@ -292,6 +327,8 @@ export const useAppStore = defineStore('app', () => {
     setView,
     requestViewSwitch,
     requestPageSwitch,
+    toggleAuditorPanel,
+    togglePolishPanel,
     confirmDiscardReview,
     cancelDiscardReview,
     doPageSwitch,

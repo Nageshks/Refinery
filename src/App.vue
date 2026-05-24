@@ -87,6 +87,26 @@ onUnmounted(() => {
         </div>
         <ReviewPanel v-if="appStore.activeView === 'review'" />
         <AuditPanel v-if="appStore.auditPanelVisible && pagesStore.activePage" />
+
+        <!-- Vertical Sidebar Rail (Collapse Pins) -->
+        <div class="sidebar-rail" v-if="pagesStore.activePage">
+          <button 
+            :class="['rail-btn', { active: appStore.auditPanelVisible }]" 
+            @click="appStore.toggleAuditorPanel()"
+            title="Toggle Draft Auditor"
+          >
+            <span class="rail-icon">🕵️‍♂️</span>
+            <span class="rail-text">Auditor</span>
+          </button>
+          <button 
+            :class="['rail-btn', { active: appStore.activeView === 'review' }]" 
+            @click="appStore.togglePolishPanel()"
+            title="Toggle AI Polishing"
+          >
+            <span class="rail-icon">✨</span>
+            <span class="rail-text">Polish</span>
+          </button>
+        </div>
       </main>
     </div>
 
@@ -306,5 +326,76 @@ onUnmounted(() => {
 @keyframes modalEnter {
   from { opacity: 0; transform: scale(0.96) translateY(8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Vertical Sidebar Rail (Collapse Pins) */
+.sidebar-rail {
+  width: 40px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--space-4);
+  gap: var(--space-6);
+  height: 100%;
+  flex-shrink: 0;
+  z-index: 10;
+  user-select: none;
+}
+
+.rail-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: var(--space-4) 0;
+  width: 100%;
+  position: relative;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.rail-btn:hover {
+  color: var(--text-secondary);
+}
+
+.rail-btn.active {
+  color: var(--accent-primary);
+  background: rgba(139, 92, 246, 0.04);
+}
+
+.rail-btn.active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent-primary);
+  border-radius: 2px 0 0 2px;
+}
+
+.rail-icon {
+  font-size: 16px;
+  transition: transform var(--transition-fast);
+}
+
+.rail-btn:hover .rail-icon {
+  transform: scale(1.1);
+}
+
+.rail-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(180deg);
 }
 </style>

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '../stores/app';
 import { usePagesStore } from '../stores/pages';
 import { useProvidersStore } from '../stores/providers';
 import { useAuditStore } from '../stores/audit';
 import type { AuditResult } from '../stores/audit';
 import { Store } from '@tauri-apps/plugin-store';
+import { setActiveProvider } from '../composables/useTauri';
 
 const appStore = useAppStore();
 const pagesStore = usePagesStore();
@@ -95,7 +96,7 @@ watch(() => activePage.value?.id, (newId) => {
   }
 }, { immediate: true });
 
-// ─── Page Type Assignment ───────────────────────────────────────────────
+// ─── Auditor Assignment ─────────────────────────────────────────
 
 const handleAssignPageType = async (typeId: string) => {
   if (!activePage.value) return;
@@ -104,16 +105,16 @@ const handleAssignPageType = async (typeId: string) => {
       await pagesStore.updatePageFormat(activePage.value.id, 'markdown');
       activeResult.value = null;
       auditStore.clearCachedAudit(activePage.value.id);
-      appStore.notify('Page type removed', 'success');
+      appStore.notify('Auditor removed', 'success');
     } else {
       await pagesStore.updatePageFormat(activePage.value.id, typeId);
       activeResult.value = null;
       auditStore.clearCachedAudit(activePage.value.id);
       const pt = auditStore.getPageType(typeId);
-      appStore.notify(`Page type set to "${pt?.name || typeId}"`, 'success');
+      appStore.notify(`Auditor set to "${pt?.name || typeId}"`, 'success');
     }
   } catch (e) {
-    appStore.notify('Failed to update page type', 'error');
+    appStore.notify('Failed to update Auditor selection', 'error');
   }
 };
 
@@ -190,6 +191,100 @@ const initResize = (e: MouseEvent) => {
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
 };
+
+// ─── AI Model Switcher (Assisting Voice) ─────────────────────────────────
+
+const showDropdown = ref(false);
+const dropdownEl = ref<HTMLElement | null>(null);
+const providerKeys = ref<Record<string, string>>({});
+
+const loadApiKeys = async () => {
+  try {
+    const store = await Store.load('credentials.json');
+    for (const provider of providersStore.providers) {
+      const key = await store.get<string>(`apikey_${provider.id}`);
+      if (key) {
+        providerKeys.value[provider.id] = key;
+      } else {
+        providerKeys.value[provider.id] = '';
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load api keys in auditor panel:', e);
+  }
+};
+
+const groupedModelsList = computed(() => {
+  const list = providersStore.models.filter(m => m.enabled);
+  const groups: Record<string, { providerName: string; providerId: string; models: any[] }> = {};
+  for (const model of list) {
+    const provider = providersStore.providers.find(p => p.provider_type === model.provider_type);
+    if (!provider) continue;
+    const key = providerKeys.value[provider.id];
+    if (!key) continue;
+    
+    if (!groups[model.provider_type]) {
+      groups[model.provider_type] = {
+        providerName: provider.name,
+        providerId: provider.id,
+        models: []
+      };
+    }
+    groups[model.provider_type].models.push(model);
+  }
+  return Object.values(groups);
+});
+
+const selectedModelDetail = computed(() => {
+  const active = providersStore.activeProvider;
+  if (!active) return null;
+  return providersStore.models.find(m => m.id === active.selected_model && m.provider_type === active.provider_type) || {
+    id: active.selected_model,
+    name: active.selected_model.split('/').pop() || active.selected_model,
+    useCase: 'Custom Model',
+    icon: '🤖'
+  };
+});
+
+const selectModel = async (model: any) => {
+  try {
+    const provider = providersStore.providers.find(p => p.provider_type === model.provider_type);
+    if (!provider) return;
+
+    await providersStore.saveProvider({
+      id: provider.id,
+      name: provider.name,
+      providerType: provider.provider_type,
+      endpoint: provider.endpoint || undefined,
+      selectedModel: model.id,
+      enabled: true
+    });
+
+    await setActiveProvider(provider.id);
+    await providersStore.fetchProviders();
+    appStore.notify(`Switched to ${model.name} (${provider.name})`, 'success');
+  } catch (e) {
+    console.error('Failed to switch active model:', e);
+    appStore.notify('Failed to switch active model', 'error');
+  }
+  showDropdown.value = false;
+};
+
+const closeDropdown = (e: MouseEvent) => {
+  if (dropdownEl.value && !dropdownEl.value.contains(e.target as Node)) {
+    showDropdown.value = false;
+  }
+};
+
+onMounted(async () => {
+  document.addEventListener('click', closeDropdown);
+  await providersStore.fetchProviders();
+  await loadApiKeys();
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdown);
+});
 </script>
 
 <template>
@@ -200,18 +295,80 @@ const initResize = (e: MouseEvent) => {
     <div class="audit-header">
       <div class="audit-header-top">
         <h3 class="audit-title">📋 Draft Auditor</h3>
-        <button class="close-audit-btn" @click="appStore.auditPanelVisible = false" title="Close">×</button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <!-- Assisting Voice Dropdown -->
+          <div v-if="providersStore.activeProvider" class="header-model-selector" ref="dropdownEl" style="position: relative;">
+            <button 
+              type="button" 
+              class="btn btn-xs btn-outline dropdown-trigger" 
+              @click.stop="showDropdown = !showDropdown"
+              :class="{ active: showDropdown }"
+              style="padding: 4px 8px; font-size: 11px; display: flex; align-items: center; gap: 4px;"
+            >
+              <span class="model-icon">{{ selectedModelDetail?.icon || '🤖' }}</span>
+              <span class="model-name" style="font-weight: 600;">{{ selectedModelDetail?.name }}</span>
+              <span class="chevron-icon" style="font-size: 8px;">▼</span>
+            </button>
+            
+            <!-- Grouped Advanced Dropdown Menu -->
+            <transition name="dropdown-fade">
+              <div v-if="showDropdown" class="dropdown-menu advanced-dropdown-menu" style="top: calc(100% + 6px); bottom: auto; right: 0; left: auto; min-width: 240px; transform-origin: top right;">
+                <div class="dropdown-header-title">Select Assisting Voice</div>
+                <div class="dropdown-scroll-area">
+                  <div 
+                    v-for="group in groupedModelsList" 
+                    :key="group.providerId" 
+                    class="dropdown-group"
+                  >
+                    <div class="dropdown-group-header">
+                      <span class="group-header-icon">
+                        {{ group.providerId === 'openrouter' ? '🔗' : group.providerId === 'groq' ? '⚡' : '💚' }}
+                      </span>
+                      <span class="group-header-text">{{ group.providerName }}</span>
+                    </div>
+                    <button
+                      v-for="model in group.models"
+                      :key="model.id"
+                      type="button"
+                      class="dropdown-item"
+                      :class="{ selected: providersStore.activeProvider?.selected_model === model.id && providersStore.activeProvider?.provider_type === group.providerId }"
+                      @click="selectModel(model)"
+                    >
+                      <div class="item-icon-col">
+                        <span class="model-icon">{{ model.icon || '🤖' }}</span>
+                      </div>
+                      <div class="item-text-col">
+                        <div class="item-name-row">
+                          <span class="item-name">{{ model.name }}</span>
+                          <span v-if="providersStore.activeProvider?.selected_model === model.id && providersStore.activeProvider?.provider_type === group.providerId" class="selected-check">✓</span>
+                        </div>
+                        <div class="item-desc" v-if="model.use_case">{{ model.use_case }}</div>
+                      </div>
+                    </button>
+                  </div>
+                  
+                  <div v-if="groupedModelsList.length === 0" class="dropdown-empty-state" style="padding: var(--space-4) var(--space-3); text-align: center;">
+                    <p class="text-xs text-muted" style="margin: 0; line-height: 1.4;">
+                      No API keys configured. Set them up in settings first.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+          <button class="close-audit-btn" @click="appStore.auditPanelVisible = false" title="Close">×</button>
+        </div>
       </div>
 
-      <!-- Page Type Selector -->
+      <!-- Active Auditor Selector -->
       <div class="audit-type-selector">
-        <label class="selector-label">Page Type</label>
+        <label class="selector-label">Auditor</label>
         <select
           class="type-dropdown"
           :value="hasPageType ? pageFormatType : '__none__'"
           @change="handleAssignPageType(($event.target as HTMLSelectElement).value)"
         >
-          <option value="__none__">None (No Audit)</option>
+          <option value="__none__">No Auditor (Disable Auditing)</option>
           <option
             v-for="pt in availablePageTypes"
             :key="pt.id"
@@ -226,28 +383,28 @@ const initResize = (e: MouseEvent) => {
     <!-- Body -->
     <div class="audit-body">
 
-      <!-- No Page Type Assigned -->
+      <!-- No Auditor Assigned -->
       <div v-if="!hasPageType" class="audit-empty">
         <span class="empty-icon">📝</span>
-        <p class="empty-text">No Page Type Assigned</p>
+        <p class="empty-text">No Auditor Selected</p>
         <p class="empty-subtext">
-          Select a page type above to enable structured AI audits for this draft.
+          Select an Auditor from the dropdown above to enable structured AI audits for this draft.
         </p>
         <p class="empty-subtext" v-if="availablePageTypes.length === 0">
-          No page types configured yet. Go to <strong>Settings → Page Types</strong> to create one.
+          No Auditor profiles configured yet. Go to <strong>Settings → Auditors</strong> to create one.
         </p>
       </div>
 
-      <!-- Page Type Assigned but No Page Types Configured -->
+      <!-- Auditor Assigned but Not Found -->
       <div v-else-if="!assignedPageType" class="audit-empty">
         <span class="empty-icon">⚠️</span>
-        <p class="empty-text">Page Type Not Found</p>
+        <p class="empty-text">Auditor Not Found</p>
         <p class="empty-subtext">
-          The assigned page type "{{ pageFormatType }}" was not found. It may have been deleted. Please select a different type.
+          The assigned Auditor "{{ pageFormatType }}" was not found. It may have been deleted. Please select a different Auditor.
         </p>
       </div>
 
-      <!-- Page Type Assigned — Ready to Audit -->
+      <!-- Auditor Assigned — Ready to Audit -->
       <template v-else>
 
         <!-- Stale Warning -->
@@ -957,5 +1114,185 @@ const initResize = (e: MouseEvent) => {
   font-size: 10px;
   color: var(--text-muted);
   line-height: 1.2;
+}
+
+/* AI Model Switcher Dropdown Styles */
+.header-model-selector {
+  display: inline-flex;
+}
+
+.dropdown-trigger {
+  border-color: var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dropdown-trigger:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-hover);
+}
+
+.dropdown-trigger.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.model-icon {
+  font-size: 14px;
+}
+
+.model-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.chevron-icon {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.dropdown-trigger.active .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 240px;
+  background: var(--bg-dropdown);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  z-index: 100;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.dropdown-header-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 600;
+}
+
+.dropdown-scroll-area {
+  max-height: 240px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+
+.dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+.dropdown-item.selected {
+  background: var(--accent-subtle);
+}
+
+.dropdown-group {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.dropdown-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.dropdown-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-1) var(--space-3);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-muted);
+  letter-spacing: 0.05em;
+}
+
+.group-header-icon {
+  font-size: 12px;
+}
+
+.group-header-text {
+  opacity: 0.85;
+}
+
+.item-icon-col {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 2px;
+}
+
+.item-text-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-name {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.selected-check {
+  font-size: 12px;
+  color: var(--accent-primary);
+  font-weight: bold;
+}
+
+.item-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* Transitions */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 </style>

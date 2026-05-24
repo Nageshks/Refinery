@@ -66,7 +66,7 @@ export const useAuditStore = defineStore('audit', () => {
       if (!pageTypes.value.some(pt => pt.id === 'default')) {
         const defaultSeed: PageTypeDefinition = {
           id: 'default',
-          name: 'General Document',
+          name: 'General Auditor',
           icon: '📄',
           inheritDefault: false,
           checks: [
@@ -100,7 +100,7 @@ export const useAuditStore = defineStore('audit', () => {
       if (!pageTypes.value.some(pt => pt.id === 'default')) {
         pageTypes.value.unshift({
           id: 'default',
-          name: 'General Document',
+          name: 'General Auditor',
           icon: '📄',
           inheritDefault: false,
           checks: [

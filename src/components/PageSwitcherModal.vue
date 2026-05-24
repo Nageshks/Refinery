@@ -169,7 +169,9 @@ const commands: CommandItem[] = [
     category: 'Commands',
     action: () => {
       console.log('CommandPalette: Executing Switch to Polish Mode.');
-      appStore.requestViewSwitch('review');
+      if (appStore.activeView !== 'review') {
+        appStore.togglePolishPanel();
+      }
     }
   },
   {
@@ -180,7 +182,9 @@ const commands: CommandItem[] = [
     category: 'Commands',
     action: () => {
       console.log('CommandPalette: Executing Switch to Think Mode.');
-      appStore.requestViewSwitch('edit');
+      if (appStore.activeView === 'review') {
+        appStore.togglePolishPanel();
+      }
     }
   },
   {
@@ -191,8 +195,7 @@ const commands: CommandItem[] = [
     category: 'Commands',
     action: () => {
       console.log('CommandPalette: Executing Toggle Audit Panel.');
-      appStore.auditPanelVisible = !appStore.auditPanelVisible;
-      appStore.notify(`Audit Panel ${appStore.auditPanelVisible ? 'Visible' : 'Hidden'}`, 'success');
+      appStore.toggleAuditorPanel();
     }
   }
 ];

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { usePagesStore } from '../stores/pages';
 import { useProvidersStore } from '../stores/providers';
 import { useAppStore } from '../stores/app';
@@ -117,11 +117,6 @@ const selectModel = async (model: any) => {
     await providersStore.fetchProviders();
 
     appStore.notify(`Switched to ${model.name} (${provider.name})`, 'success');
-
-    // Auto-retrigger review if in review mode and session is not loaded yet
-    if (appStore.activeView === 'review' && !review.reviewResult.value) {
-      await handleReview();
-    }
   } catch (e) {
     console.error('Failed to switch active model:', e);
     appStore.notify('Failed to switch active model', 'error');
@@ -135,23 +130,10 @@ const closeDropdown = (e: MouseEvent) => {
   }
 };
 
-const triggerAutoReviewIfNeeded = async () => {
-  if (appStore.activeView === 'review') {
-    const page = pagesStore.activePage;
-    if (page && !page.last_review_session_id && !review.reviewResult.value && !review.loading.value) {
-      await handleReview();
-    }
-  }
-};
-
-watch(() => appStore.activeView, triggerAutoReviewIfNeeded);
-watch(() => pagesStore.activePageId, triggerAutoReviewIfNeeded);
-
 onMounted(async () => {
   document.addEventListener('click', closeDropdown);
   await providersStore.fetchProviders();
   await loadApiKeys();
-  await triggerAutoReviewIfNeeded();
 });
 
 onUnmounted(() => {

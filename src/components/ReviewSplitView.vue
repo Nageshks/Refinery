@@ -464,7 +464,7 @@ onUnmounted(() => {
 }
 
 .right-column {
-  background: var(--bg-preview-column);
+  background: var(--bg-primary);
 }
 
 
