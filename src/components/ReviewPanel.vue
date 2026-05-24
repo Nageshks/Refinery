@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { usePagesStore } from '../stores/pages';
 import { useProvidersStore } from '../stores/providers';
 import { useAppStore } from '../stores/app';
+import { useReviewStore } from '../stores/review';
 import { useReview } from '../composables/useReview';
 import { Store } from '@tauri-apps/plugin-store';
 import SuggestionItemComp from './SuggestionItem.vue';
@@ -12,6 +13,7 @@ import { setActiveProvider } from '../composables/useTauri';
 const pagesStore = usePagesStore();
 const providersStore = useProvidersStore();
 const appStore = useAppStore();
+const reviewStore = useReviewStore();
 const review = useReview();
 
 const isDragging = ref(false);
@@ -154,7 +156,8 @@ const handleReview = async () => {
       appStore.notify('API key not configured. Go to Settings.', 'error');
       return;
     }
-    await review.doReview(page.id, apiKey, provider.selected_model, provider.endpoint || undefined);
+    const context = appStore.activeSidebarTab === 'polish' ? reviewStore.editorialContext : '';
+    await review.doReview(page.id, apiKey, provider.selected_model, provider.endpoint || undefined, context);
     appStore.notify(`Review complete: ${review.totalCount()} suggestions`, 'success');
   } catch (e: any) {
     appStore.notify(typeof e === 'string' ? e : 'Review failed', 'error');
@@ -197,28 +200,31 @@ const handleDismissReview = async () => {
   appStore.notify('Polishing session cleared', 'success');
 };
 
-// Flattened list of suggestions with injected category label
+// Flattened list of suggestions with injected category label and category tag
 const allSuggestions = computed(() => {
   return review.groups.value.flatMap(gwi => {
     const categoryLabel = gwi.group.label || categoryLabels[gwi.group.category] || gwi.group.category;
+    const category = gwi.group.category;
     return gwi.items.map(item => ({
       ...item,
+      category,
       categoryLabel
     }));
   });
 });
 
 const isQuickFix = (item: any) => {
-  return item.categoryLabel === 'Spelling' || 
-         item.category === 'spelling' || 
-         ((item.categoryLabel === 'Grammar' || item.category === 'grammar') && item.original_text.length < 15);
+  const category = (item.category || '').toLowerCase();
+  const label = (item.categoryLabel || '').toLowerCase();
+  return category === 'spelling' || 
+         label.includes('typo') || 
+         label.includes('spelling') || 
+         ((category === 'grammar' || label.includes('grammar')) && item.original_text.length < 15);
 };
 
 const quickFixes = computed(() => {
   return allSuggestions.value.filter(isQuickFix);
 });
-
-const showQuickFixes = ref(true);
 
 const groupActiveIndices = ref<Record<string, number>>({});
 
@@ -282,6 +288,54 @@ const approveAllQuickFixes = async () => {
     await review.refreshPreview(pagesStore.activePageId);
   }
   appStore.notify(`Approved all ${pendingFixes.length} quick fixes!`, 'success');
+};
+
+const getShortDiffText = (item: any) => {
+  const oldStr = item.original_text;
+  const newStr = item.replacement_text;
+  
+  if (!oldStr || !newStr) return { original: oldStr, replacement: newStr };
+  
+  const oldWords = oldStr.split(/\s+/);
+  const newWords = newStr.split(/\s+/);
+  
+  let start = 0;
+  while (start < oldWords.length && start < newWords.length && oldWords[start] === newWords[start]) {
+    start++;
+  }
+  
+  let oldEnd = oldWords.length - 1;
+  let newEnd = newWords.length - 1;
+  while (oldEnd >= start && newEnd >= start && oldWords[oldEnd] === newWords[newEnd]) {
+    oldEnd--;
+    newEnd--;
+  }
+  
+  const contextBefore = 1;
+  const contextAfter = 1;
+  
+  const displayStart = Math.max(0, start - contextBefore);
+  const displayOldEnd = Math.min(oldWords.length - 1, oldEnd + contextAfter);
+  const displayNewEnd = Math.min(newWords.length - 1, newEnd + contextAfter);
+  
+  let finalOld = oldWords.slice(displayStart, displayOldEnd + 1).join(' ');
+  let finalNew = newWords.slice(displayStart, displayNewEnd + 1).join(' ');
+  
+  if (displayStart > 0) {
+    finalOld = '...' + finalOld;
+    finalNew = '...' + finalNew;
+  }
+  if (displayOldEnd < oldWords.length - 1) {
+    finalOld = finalOld + '...';
+  }
+  if (displayNewEnd < newWords.length - 1) {
+    finalNew = finalNew + '...';
+  }
+  
+  return {
+    original: finalOld,
+    replacement: finalNew
+  };
 };
 </script>
 
@@ -397,11 +451,42 @@ const approveAllQuickFixes = async () => {
     <div class="review-body">
       <!-- No review yet -->
       <div v-if="review.groups.value.length === 0 && !review.loading.value" class="review-empty">
-        <p class="minimal-sidebar-instruction">Choose an assisting voice at the top to begin refining your draft.</p>
-        
-        <button class="btn-polish-trigger" @click="handleReview" :disabled="!pagesStore.activePage">
-          Begin Polishing
-        </button>
+        <template v-if="appStore.activeSidebarTab === 'speller'">
+          <p class="minimal-sidebar-instruction">Choose an assisting voice at the top to begin proofreading your draft.</p>
+          
+          <button class="btn-polish-trigger btn-speller-trigger" @click="handleReview" :disabled="!pagesStore.activePage">
+            Begin Proofreading
+          </button>
+        </template>
+
+        <template v-else-if="appStore.activeSidebarTab === 'polish'">
+          <p class="minimal-sidebar-instruction">Provide editorial details below to personalize the style revisions.</p>
+          
+          <!-- Editorial Context Card -->
+          <div class="editorial-context-card">
+            <label for="polish-context-textarea" class="context-label">Editorial Context & Goals</label>
+            <textarea
+              id="polish-context-textarea"
+              v-model="reviewStore.editorialContext"
+              placeholder="e.g., Target audience (developers), publication channel (blog post), desired tone (witty & clear), style guidelines, or specific depth..."
+              class="context-textarea"
+              rows="4"
+            ></textarea>
+          </div>
+
+          <button class="btn-polish-trigger" @click="handleReview" :disabled="!pagesStore.activePage">
+            Begin Polishing
+          </button>
+        </template>
+
+        <template v-else>
+          <p class="minimal-sidebar-instruction">Choose an assisting voice at the top to begin refining your draft.</p>
+          
+          <button class="btn-polish-trigger" @click="handleReview" :disabled="!pagesStore.activePage">
+            Begin Polishing
+          </button>
+        </template>
+
         <p v-if="review.error.value" class="text-xs" style="color: var(--color-error); margin-top: 8px;">
           {{ review.error.value }}
         </p>
@@ -418,18 +503,12 @@ const approveAllQuickFixes = async () => {
         </button>
       </div>
  
-      <!-- Suggestions Classified Lists (Quick Fixes & Stylistic Revisions) -->
-      <template v-else>
-        <!-- 1. Quick Fixes Section -->
-        <div v-if="quickFixes.length > 0" class="quick-fixes-section">
-          <div class="quick-fixes-header" @click="showQuickFixes = !showQuickFixes">
-            <div class="header-left-title">
-              <span :class="['chevron-indicator', { collapsed: !showQuickFixes }]">▼</span>
-              <h4>Quick Fixes</h4>
-              <span class="quick-fixes-count-badge">{{ quickFixes.length }}</span>
-            </div>
+      <!-- 1. SPELLER VIEW: Compact Typo Fixes Checklist -->
+      <template v-else-if="appStore.activeSidebarTab === 'speller'">
+        <div v-if="quickFixes.length > 0" class="speller-container">
+          <div class="speller-header-row">
+            <h4>Mechanical Corrections ({{ quickFixes.length }})</h4>
             <button 
-              v-if="quickFixes.some(i => i.approval_state !== 'approved')"
               type="button"
               class="btn btn-xs btn-outline btn-accept-all-quick"
               @click.stop="approveAllQuickFixes"
@@ -438,37 +517,37 @@ const approveAllQuickFixes = async () => {
             </button>
           </div>
           
-          <transition name="collapse">
-            <div v-show="showQuickFixes" class="quick-fixes-rows-list">
-              <div 
-                v-for="item in quickFixes" 
-                :key="item.id"
-                :class="['quick-fix-row', `state-${item.approval_state}`]"
-                @click="handleApprove(item.id)"
-              >
-                <div class="quick-fix-info-col">
-                  <span class="quick-fix-pill">{{ item.categoryLabel }}</span>
-                  <div class="quick-fix-diff-preview">
-                    <span class="diff-original">{{ item.original_text }}</span>
-                    <span class="diff-arrow">➔</span>
-                    <span class="diff-replacement">{{ item.replacement_text }}</span>
-                  </div>
-                </div>
-                <div class="quick-fix-status-icon">
-                  <span v-if="item.approval_state === 'approved'" class="tick-icon">✓</span>
-                  <span v-else class="bullet-icon"></span>
+          <div class="quick-fixes-rows-list flat-checklist">
+            <div 
+              v-for="item in quickFixes" 
+              :key="item.id"
+              :class="['quick-fix-row', `state-${item.approval_state}`]"
+              @click="handleApprove(item.id)"
+            >
+              <div class="quick-fix-info-col">
+                <span class="quick-fix-pill">{{ item.categoryLabel }}</span>
+                <div class="quick-fix-diff-preview">
+                  <span class="diff-original">{{ getShortDiffText(item).original }}</span>
+                  <span class="diff-arrow">➔</span>
+                  <span class="diff-replacement">{{ getShortDiffText(item).replacement }}</span>
                 </div>
               </div>
+              <div class="quick-fix-status-icon">
+                <span v-if="item.approval_state === 'approved'" class="tick-icon">✓</span>
+                <span v-else class="bullet-icon"></span>
+              </div>
             </div>
-          </transition>
+          </div>
         </div>
+        <div v-else class="review-empty" style="padding: 32px 16px;">
+          <p class="minimal-sidebar-instruction">No spelling or mechanical typos found in this draft!</p>
+        </div>
+      </template>
 
-        <!-- Divider if both exist -->
-        <div v-if="quickFixes.length > 0 && stylisticGroups.length > 0" class="sections-divider"></div>
-
-        <!-- 2. Stylistic Revisions Section -->
+      <!-- 2. POLISH VIEW: Stylistic Revisions Card List -->
+      <template v-else-if="appStore.activeSidebarTab === 'polish'">
         <div v-if="stylisticGroups.length > 0" class="stylistic-revisions-section">
-          <div class="corrections-header" style="margin-bottom: 8px; padding: 0 4px;">
+          <div class="corrections-header" style="margin-bottom: 12px; padding: 0 4px;">
             <h4 style="font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; margin: 0;">
               Stylistic Revisions ({{ stylisticGroups.length }})
             </h4>
@@ -506,9 +585,8 @@ const approveAllQuickFixes = async () => {
             </div>
           </div>
         </div>
-
-        <div v-if="quickFixes.length === 0 && stylisticGroups.length === 0" class="review-empty" style="padding: 32px 16px;">
-          <p class="minimal-sidebar-instruction">All corrections applied or dismissed!</p>
+        <div v-else class="review-empty" style="padding: 32px 16px;">
+          <p class="minimal-sidebar-instruction">All flow improvements and style edits resolved!</p>
         </div>
       </template>
     </div>
@@ -971,10 +1049,11 @@ html[data-theme="light"] .btn-accept-all-quick:hover {
 
 .quick-fix-info-col {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   flex: 1;
   min-width: 0;
+  padding: 2px 0;
 }
 
 .quick-fix-pill {
@@ -987,18 +1066,18 @@ html[data-theme="light"] .btn-accept-all-quick:hover {
   border-radius: var(--radius-xs);
   letter-spacing: 0.02em;
   flex-shrink: 0;
+  margin-top: 1.5px;
 }
 
 .quick-fix-diff-preview {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   font-size: 11px;
   color: var(--text-primary);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .diff-original {
@@ -1165,5 +1244,108 @@ html[data-theme="light"] .alt-tab-btn.approved .tab-indicator-dot {
 .collapse-leave-to {
   max-height: 0;
   opacity: 0;
+}
+
+/* Speller View Custom Styles */
+.speller-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+
+.speller-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.speller-header-row h4 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.flat-checklist {
+  max-height: none !important; /* Speller has no max height limit, takes full panel scroll! */
+}
+
+/* Editorial Context UI Premium Styles */
+.editorial-context-card {
+  width: 100%;
+  max-width: 280px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 4px;
+  margin-bottom: 2px;
+  text-align: left;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.editorial-context-card:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.context-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.context-textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color var(--transition-fast);
+}
+
+.context-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.context-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Proofreader Tab Specific Colors */
+.btn-speller-trigger {
+  background: #10b981 !important;
+  box-shadow: 0 2px 8px -2px rgba(16, 185, 129, 0.25) !important;
+}
+
+.btn-speller-trigger:hover:not(:disabled) {
+  background: #059669 !important;
+  box-shadow: 0 4px 12px -3px rgba(16, 185, 129, 0.35) !important;
 }
 </style>

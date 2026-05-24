@@ -91,20 +91,28 @@ onUnmounted(() => {
         <!-- Vertical Sidebar Rail (Collapse Pins) -->
         <div class="sidebar-rail" v-if="pagesStore.activePage">
           <button 
-            :class="['rail-btn', { active: appStore.auditPanelVisible }]" 
-            @click="appStore.toggleAuditorPanel()"
-            title="Toggle Draft Auditor"
+            :class="['rail-btn', { active: appStore.activeSidebarTab === 'speller' }]" 
+            @click="appStore.toggleSpellerPanel()"
+            title="Toggle Speller & Proofreader"
           >
-            <span class="rail-icon">🕵️‍♂️</span>
-            <span class="rail-text">Auditor</span>
+            <span class="rail-icon">✓</span>
+            <span class="rail-text">Proofread</span>
           </button>
           <button 
-            :class="['rail-btn', { active: appStore.activeView === 'review' }]" 
+            :class="['rail-btn', { active: appStore.activeSidebarTab === 'polish' }]" 
             @click="appStore.togglePolishPanel()"
             title="Toggle AI Polishing"
           >
             <span class="rail-icon">✨</span>
             <span class="rail-text">Polish</span>
+          </button>
+          <button 
+            :class="['rail-btn', { active: appStore.activeSidebarTab === 'auditor' }]" 
+            @click="appStore.toggleAuditorPanel()"
+            title="Toggle Draft Auditor"
+          >
+            <span class="rail-icon">🕵️‍♂️</span>
+            <span class="rail-text">Auditor</span>
           </button>
         </div>
       </main>

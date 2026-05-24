@@ -11,6 +11,7 @@ export const useReviewStore = defineStore('review', () => {
   const groups = ref<SuggestionGroupWithItems[]>([]);
   const preview = ref<PreviewResult | null>(null);
   const sessionId = ref<string | null>(null);
+  const editorialContext = ref('');
 
   const setReviewResult = (result: ReviewResult) => {
     reviewResult.value = result;
@@ -34,5 +35,8 @@ export const useReviewStore = defineStore('review', () => {
     }
   };
 
-  return { loading, cancelled, error, reviewResult, groups, preview, sessionId, setReviewResult, clearReview };
+  return { 
+    loading, cancelled, error, reviewResult, groups, preview, 
+    sessionId, editorialContext, setReviewResult, clearReview 
+  };
 });

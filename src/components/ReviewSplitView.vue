@@ -46,6 +46,8 @@ const processedHighlightedContent = computed(() => {
   const doc = parser.parseFromString(html, 'text/html');
   const highlights = doc.querySelectorAll('.preview-highlight-inserted, .preview-highlight-original');
 
+  const activeTab = appStore.activeSidebarTab;
+
   highlights.forEach(el => {
     const id = el.getAttribute('data-suggestion-id');
     if (id) {
@@ -61,12 +63,33 @@ const processedHighlightedContent = computed(() => {
       }
 
       if (foundItem && foundGroup) {
-        el.classList.add(`state-${foundItem.approval_state}`);
-        el.classList.add(`category-${foundGroup.category}`);
-        if (foundItem.conflict_state === 'overlapping') {
-          el.classList.add('has-conflict');
+        // Determine if it is a Quick Fix spelling/typo edit
+        const category = (foundGroup.category || '').toLowerCase();
+        const label = (foundGroup.label || foundGroup.category || '').toLowerCase();
+        const isQuickFix = category === 'spelling' || 
+                           label.includes('typo') || 
+                           label.includes('spelling') || 
+                           ((category === 'grammar' || label.includes('grammar')) && foundItem.original_text.length < 15);
+
+        // Filter highlights dynamically based on which rail tab is active
+        let showHighlight = false;
+        if (activeTab === 'speller') {
+          showHighlight = isQuickFix;
+        } else if (activeTab === 'polish') {
+          showHighlight = !isQuickFix;
         }
-        el.setAttribute('title', `${foundGroup.label || foundGroup.category}: ${foundItem.explanation}`);
+
+        if (showHighlight) {
+          el.classList.add(`state-${foundItem.approval_state}`);
+          el.classList.add(`category-${foundGroup.category}`);
+          if (foundItem.conflict_state === 'overlapping') {
+            el.classList.add('has-conflict');
+          }
+          el.setAttribute('title', `${foundGroup.label || foundGroup.category}: ${foundItem.explanation}`);
+        } else {
+          el.classList.add('highlight-hidden');
+          el.removeAttribute('title');
+        }
       }
     }
   });
@@ -1186,5 +1209,17 @@ html[data-theme="light"] .popover-conflict-warning {
 
 html[data-theme="light"] .alt-choice-check {
   color: #059669;
+}
+
+/* Dynamically Hidden Highlights CSS overrides */
+.preview-content-interactive :deep(.highlight-hidden) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  text-decoration: none !important;
+  cursor: default !important;
+  color: inherit !important;
+  box-shadow: none !important;
 }
 </style>

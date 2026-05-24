@@ -1,33 +1,44 @@
 /// System prompt for AI review — instructs the model to return structured JSON suggestions
-pub fn review_system_prompt() -> &'static str {
-    r#"You are an expert writing editor assistant. Your job is to analyze the given text and provide structured editing suggestions.
+pub fn review_system_prompt(editorial_context: Option<&str>) -> String {
+    let context_rule = match editorial_context {
+        Some(ctx) if !ctx.trim().is_empty() => format!(
+            "\n8. EDITORIAL CONTEXT & PARAMETERS: The user has set specific goals for this writing. You MUST personalize all suggestions (tone, style, audience fit, depth) to strictly align with these parameters:\n\"\"\"\n{}\n\"\"\"\n",
+            ctx.trim()
+        ),
+        _ => String::new(),
+    };
+
+    format!(
+        r#"You are an expert writing editor assistant. Your job is to analyze the given text and provide structured editing suggestions.
 
 RULES:
 1. Return ONLY valid JSON. No markdown code fences, no explanatory text outside JSON.
 2. Categorize every suggestion into exactly one of: "spelling", "grammar", "vocabulary", "clarity", "fluency", "rewrite", "recommendation".
 3. For each suggestion, include the EXACT original text that should be replaced.
 4. Provide a confidence score (0.0 to 1.0) for each suggestion.
-5. If no suggestions are needed, return: {"suggestion_groups": []}
+5. If no suggestions are needed, return: {{"suggestion_groups": []}}
 6. Prefer minimal, targeted edits over full rewrites.
-7. Preserve the author's voice and intent.
+7. Preserve the author's voice and intent.{}
 
 OUTPUT SCHEMA:
-{
+{{
   "suggestion_groups": [
-    {
+    {{
       "category": "<spelling|grammar|vocabulary|clarity|fluency|rewrite|recommendation>",
       "label": "<human-readable group label>",
       "items": [
-        {
+        {{
           "original_text": "<exact text to be replaced — must be exact substring of input>",
           "replacement_text": "<suggested replacement>",
           "explanation": "<brief reason for the change>",
           "confidence": <0.0 to 1.0>
-        }
+        }}
       ]
-    }
+    }}
   ]
-}"#
+}}"#,
+        context_rule
+    )
 }
 
 /// User prompt template for AI review

@@ -413,6 +413,18 @@ onUnmounted(() => {
           <span>Draft modified since last analysis. Re-run to update.</span>
         </div>
 
+        <!-- Editorial Context Card (Stunning Glassmorphic Card) -->
+        <div v-if="!auditStore.auditing" class="editorial-context-card" style="margin-bottom: var(--space-3);">
+          <label for="audit-context-textarea" class="context-label">Auditing Context & Focus</label>
+          <textarea
+            id="audit-context-textarea"
+            v-model="auditStore.auditContext"
+            placeholder="Optional: Enter target audience, goals, tone, or specific details to focus the audit on..."
+            class="context-textarea"
+            rows="3"
+          ></textarea>
+        </div>
+
         <!-- Checks Preview (before running) -->
         <div v-if="!activeResult && !auditStore.auditing" class="checks-preview">
           <div class="checks-preview-header">
@@ -1294,5 +1306,62 @@ onUnmounted(() => {
 .dropdown-fade-leave-to {
   opacity: 0;
   transform: translateY(4px);
+}
+
+/* Editorial Context UI Premium Styles */
+.editorial-context-card {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 4px;
+  margin-bottom: 2px;
+  text-align: left;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.editorial-context-card:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.context-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.context-textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 70px;
+  transition: border-color var(--transition-fast);
+}
+
+.context-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.context-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 </style>

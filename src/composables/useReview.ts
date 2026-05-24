@@ -5,14 +5,14 @@ import { startReview, updateSuggestionApproval, computePreview, applyApprovedSug
 
 export function useReview() {
   const store = useReviewStore();
-  const { loading, error, reviewResult, groups, preview } = storeToRefs(store);
+  const { loading, error, reviewResult, groups, preview, editorialContext } = storeToRefs(store);
 
-  const doReview = async (pageId: string, apiKey: string, model: string, endpoint?: string) => {
+  const doReview = async (pageId: string, apiKey: string, model: string, endpoint?: string, context?: string) => {
     loading.value = true;
     error.value = null;
     store.cancelled = false;
     try {
-      const result = await startReview(pageId, apiKey, model, endpoint);
+      const result = await startReview(pageId, apiKey, model, endpoint, context);
       if (store.cancelled) {
         return; // Discard result since it was cancelled
       }
@@ -201,7 +201,7 @@ export function useReview() {
   };
 
   return {
-    loading, error, reviewResult, groups, preview,
+    loading, error, reviewResult, groups, preview, editorialContext,
     doReview, cancelReview, toggleItemApproval, toggleGroupApproval,
     refreshPreview, applyChanges, clearReview, loadReviewSession,
     approvedCount, totalCount,

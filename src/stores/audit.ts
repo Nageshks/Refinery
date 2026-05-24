@@ -51,6 +51,7 @@ export const useAuditStore = defineStore('audit', () => {
   const auditing = ref(false);
   const auditError = ref<string | null>(null);
   const storeReady = ref(false);
+  const auditContext = ref('');
 
   // ─── Persistence ────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ export const useAuditStore = defineStore('audit', () => {
 
   // ─── Prompt Synthesis ───────────────────────────────────────────────
 
-  const buildAuditPrompt = (checks: AuditCheckDefinition[], content: string): string => {
+  const buildAuditPrompt = (checks: AuditCheckDefinition[], content: string, auditContext?: string): string => {
     const checkInstructions = checks.map((check, idx) => {
       let typeInstruction = '';
       if (check.widgetType === 'binary') {
@@ -241,8 +242,12 @@ ${typeInstruction}
 Audit instruction: ${check.prompt}`;
     }).join('\n---\n');
 
-    return `You are a professional writing auditor. Analyze the following draft according to the parameters below. For EACH parameter, provide your assessment.
+    const contextInstruction = auditContext && auditContext.trim()
+      ? `\nEDITORIAL CONTEXT & AUDITING GUIDELINES:\nThe user has specified the following context for this draft. Assess and audit the writing strictly within these parameters:\n"${auditContext.trim()}"\n`
+      : '';
 
+    return `You are a professional writing auditor. Analyze the following draft according to the parameters below. For EACH parameter, provide your assessment.${contextInstruction}
+ 
 CRITICAL: You MUST respond with ONLY valid JSON matching this exact schema — no markdown fencing, no commentary before or after:
 {
   "checks": [
@@ -285,7 +290,7 @@ ${content}`;
     auditError.value = null;
 
     try {
-      const prompt = buildAuditPrompt(checks, content);
+      const prompt = buildAuditPrompt(checks, content, auditContext.value);
       const contentHash = computeContentHash(content);
 
       // Call the AI via the existing provider endpoint pattern
@@ -298,7 +303,14 @@ ${content}`;
         body: JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: 'You are a professional writing auditor. Always respond with valid JSON only.' },
+            { 
+              role: 'system', 
+              content: `You are a professional writing auditor. Always respond with valid JSON only.${
+                auditContext.value && auditContext.value.trim()
+                  ? `\n\nCRITICAL EDITORIAL CONTEXT & GUIDELINES:\nThe user has specified the following context for this draft. You MUST audit the writing and evaluate all parameters strictly conforming to these guidelines:\n"${auditContext.value.trim()}"`
+                  : ''
+              }` 
+            },
             { role: 'user', content: prompt }
           ],
           temperature: 0.3,
@@ -368,6 +380,7 @@ ${content}`;
     auditing,
     auditError,
     storeReady,
+    auditContext,
     defaultPageType,
     customPageTypes,
     getPageType,

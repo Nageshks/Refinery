@@ -17,6 +17,7 @@ pub async fn start_review(
     api_key: String,
     model: String,
     endpoint: Option<String>,
+    editorial_context: Option<String>,
 ) -> AppResult<ReviewResult> {
     // 1. Load page content
     let (page_content, session_id, provider_id) = {
@@ -54,11 +55,11 @@ pub async fn start_review(
 
     // 3. Call AI provider (outside lock)
     let provider = OpenRouterProvider::new(api_key, model, endpoint);
-    let system_prompt = prompts::review_system_prompt();
+    let system_prompt = prompts::review_system_prompt(editorial_context.as_deref());
     let user_prompt = prompts::review_user_prompt(&page_content);
 
     let raw_response = provider
-        .review(&page_content, system_prompt, &user_prompt)
+        .review(&page_content, &system_prompt, &user_prompt)
         .await
         .map_err(|e| AppError::Provider(e.to_string()))?;
 

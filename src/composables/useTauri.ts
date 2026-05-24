@@ -17,8 +17,8 @@ export const updatePageFormat = (pageId: string, formatType: string) =>
   invoke<Page>('update_page_format', { pageId, formatType });
 
 // ─── Review ─────────────────────────────────────────────────────────────
-export const startReview = (pageId: string, apiKey: string, model: string, endpoint?: string) =>
-  invoke<ReviewResult>('start_review', { pageId, apiKey, model, endpoint });
+export const startReview = (pageId: string, apiKey: string, model: string, endpoint?: string, editorialContext?: string) =>
+  invoke<ReviewResult>('start_review', { pageId, apiKey, model, endpoint, editorialContext });
 export const getReviewSuggestions = (sessionId: string) =>
   invoke<SuggestionGroupWithItems[]>('get_review_suggestions', { sessionId });
 export const updateSuggestionApproval = (opts: { itemId?: string; groupId?: string; approvalState: string }) =>

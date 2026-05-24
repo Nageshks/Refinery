@@ -12,6 +12,34 @@ export const useAppStore = defineStore('app', () => {
   const showSettingsModal = ref(false);
   const showPageSwitcher = ref(false);
   const auditPanelVisible = ref(false);
+  const activeSidebarTab = ref<'speller' | 'polish' | 'auditor' | null>(null);
+
+  // Sync initial state if activeView starts as review
+  if (activeView.value === 'review') {
+    activeSidebarTab.value = 'polish';
+  } else if (auditPanelVisible.value) {
+    activeSidebarTab.value = 'auditor';
+  }
+
+  // Keep tab rail in sync with view modifications
+  watch(activeView, (newView) => {
+    if (newView !== 'review') {
+      if (activeSidebarTab.value === 'speller' || activeSidebarTab.value === 'polish') {
+        activeSidebarTab.value = auditPanelVisible.value ? 'auditor' : null;
+      }
+    } else if (newView === 'review' && activeSidebarTab.value !== 'speller' && activeSidebarTab.value !== 'polish') {
+      activeSidebarTab.value = 'polish'; // default
+    }
+  });
+
+  watch(auditPanelVisible, (visible) => {
+    if (visible) {
+      activeSidebarTab.value = 'auditor';
+    } else if (activeSidebarTab.value === 'auditor') {
+      activeSidebarTab.value = null;
+    }
+  });
+
   const notification = ref<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showDiscardReviewModal = ref(false);
@@ -145,9 +173,13 @@ export const useAppStore = defineStore('app', () => {
     }
   };
 
-  watch(theme, (newVal) => {
-    localStorage.setItem('refinery_theme', newVal);
+  const dbThemeChange = () => {
+    localStorage.setItem('refinery_theme', theme.value);
     applyTheme();
+  };
+
+  watch(theme, () => {
+    dbThemeChange();
   });
 
   watch(zoomFactor, (val) => {
@@ -193,11 +225,41 @@ export const useAppStore = defineStore('app', () => {
     }
   };
 
+  const toggleSpellerPanel = () => {
+    if (activeSidebarTab.value === 'speller') {
+      activeSidebarTab.value = null;
+      requestViewSwitch('edit');
+    } else {
+      activeSidebarTab.value = 'speller';
+      auditPanelVisible.value = false;
+      if (activeView.value !== 'review') {
+        requestViewSwitch('review');
+      }
+      notify('Speller Activated', 'success');
+    }
+  };
+
+  const togglePolishPanel = () => {
+    if (activeSidebarTab.value === 'polish') {
+      activeSidebarTab.value = null;
+      requestViewSwitch('edit');
+    } else {
+      activeSidebarTab.value = 'polish';
+      auditPanelVisible.value = false;
+      if (activeView.value !== 'review') {
+        requestViewSwitch('review');
+      }
+      notify('Polishing Activated', 'success');
+    }
+  };
+
   const toggleAuditorPanel = () => {
-    if (auditPanelVisible.value) {
+    if (activeSidebarTab.value === 'auditor') {
+      activeSidebarTab.value = null;
       auditPanelVisible.value = false;
       notify('Auditor Panel Hidden', 'success');
     } else {
+      activeSidebarTab.value = 'auditor';
       if (activeView.value === 'review') {
         requestViewSwitch('edit');
         const unwatch = watch(activeView, (newView) => {
@@ -216,15 +278,6 @@ export const useAppStore = defineStore('app', () => {
         auditPanelVisible.value = true;
         notify('Auditor Panel Visible', 'success');
       }
-    }
-  };
-
-  const togglePolishPanel = () => {
-    if (activeView.value === 'review') {
-      requestViewSwitch('edit');
-    } else {
-      auditPanelVisible.value = false;
-      requestViewSwitch('review');
     }
   };
 
@@ -303,6 +356,7 @@ export const useAppStore = defineStore('app', () => {
     showSettingsModal,
     showPageSwitcher,
     auditPanelVisible,
+    activeSidebarTab,
     notification,
     sidebarWidth,
     reviewPanelWidth,
@@ -329,6 +383,7 @@ export const useAppStore = defineStore('app', () => {
     requestPageSwitch,
     toggleAuditorPanel,
     togglePolishPanel,
+    toggleSpellerPanel,
     confirmDiscardReview,
     cancelDiscardReview,
     doPageSwitch,
