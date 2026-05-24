@@ -207,6 +207,82 @@ const allSuggestions = computed(() => {
     }));
   });
 });
+
+const isQuickFix = (item: any) => {
+  return item.categoryLabel === 'Spelling' || 
+         item.category === 'spelling' || 
+         ((item.categoryLabel === 'Grammar' || item.category === 'grammar') && item.original_text.length < 15);
+};
+
+const quickFixes = computed(() => {
+  return allSuggestions.value.filter(isQuickFix);
+});
+
+const showQuickFixes = ref(true);
+
+const groupActiveIndices = ref<Record<string, number>>({});
+
+const stylisticGroups = computed(() => {
+  const stylisticItems = allSuggestions.value.filter(item => !isQuickFix(item));
+  
+  // Sort by span_start
+  const sorted = [...stylisticItems].sort((a, b) => a.span_start - b.span_start);
+  
+  const groupsList: any[][] = [];
+  for (const item of sorted) {
+    let added = false;
+    for (const group of groupsList) {
+      const overlaps = group.some(other => 
+        !(item.span_end <= other.span_start || other.span_end <= item.span_start)
+      );
+      if (overlaps) {
+        group.push(item);
+        added = true;
+        break;
+      }
+    }
+    if (!added) {
+      groupsList.push([item]);
+    }
+  }
+  
+  return groupsList.map((items) => {
+    const groupKey = items.map(i => i.id).sort().join(',');
+    const approvedIndex = items.findIndex(i => i.approval_state === 'approved');
+    
+    let activeIndex = 0;
+    if (approvedIndex !== -1) {
+      activeIndex = approvedIndex;
+    } else if (groupActiveIndices.value[groupKey] !== undefined) {
+      if (groupActiveIndices.value[groupKey] < items.length) {
+        activeIndex = groupActiveIndices.value[groupKey];
+      }
+    }
+    
+    return {
+      key: groupKey,
+      items,
+      activeIndex
+    };
+  });
+});
+
+const setGroupActiveIndex = (groupKey: string, idx: number) => {
+  groupActiveIndices.value[groupKey] = idx;
+};
+
+const approveAllQuickFixes = async () => {
+  const pendingFixes = quickFixes.value.filter(i => i.approval_state !== 'approved');
+  if (pendingFixes.length === 0) return;
+  
+  for (const item of pendingFixes) {
+    await review.toggleItemApproval(item.id, 'approved');
+  }
+  if (pagesStore.activePageId) {
+    await review.refreshPreview(pagesStore.activePageId);
+  }
+  appStore.notify(`Approved all ${pendingFixes.length} quick fixes!`, 'success');
+};
 </script>
 
 <template>
@@ -342,23 +418,97 @@ const allSuggestions = computed(() => {
         </button>
       </div>
  
-      <!-- Suggestions Flat List -->
+      <!-- Suggestions Classified Lists (Quick Fixes & Stylistic Revisions) -->
       <template v-else>
-        <div class="corrections-header" style="margin-bottom: 8px; padding: 0 4px;">
-          <h4 style="font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; margin: 0;">
-            Corrections ({{ review.totalCount() }})
-          </h4>
+        <!-- 1. Quick Fixes Section -->
+        <div v-if="quickFixes.length > 0" class="quick-fixes-section">
+          <div class="quick-fixes-header" @click="showQuickFixes = !showQuickFixes">
+            <div class="header-left-title">
+              <span :class="['chevron-indicator', { collapsed: !showQuickFixes }]">▼</span>
+              <h4>Quick Fixes</h4>
+              <span class="quick-fixes-count-badge">{{ quickFixes.length }}</span>
+            </div>
+            <button 
+              v-if="quickFixes.some(i => i.approval_state !== 'approved')"
+              type="button"
+              class="btn btn-xs btn-outline btn-accept-all-quick"
+              @click.stop="approveAllQuickFixes"
+            >
+              ✓ Accept All
+            </button>
+          </div>
+          
+          <transition name="collapse">
+            <div v-show="showQuickFixes" class="quick-fixes-rows-list">
+              <div 
+                v-for="item in quickFixes" 
+                :key="item.id"
+                :class="['quick-fix-row', `state-${item.approval_state}`]"
+                @click="handleApprove(item.id)"
+              >
+                <div class="quick-fix-info-col">
+                  <span class="quick-fix-pill">{{ item.categoryLabel }}</span>
+                  <div class="quick-fix-diff-preview">
+                    <span class="diff-original">{{ item.original_text }}</span>
+                    <span class="diff-arrow">➔</span>
+                    <span class="diff-replacement">{{ item.replacement_text }}</span>
+                  </div>
+                </div>
+                <div class="quick-fix-status-icon">
+                  <span v-if="item.approval_state === 'approved'" class="tick-icon">✓</span>
+                  <span v-else class="bullet-icon"></span>
+                </div>
+              </div>
+            </div>
+          </transition>
         </div>
- 
-        <div class="suggestions-flat-list">
-          <SuggestionItemComp
-            v-for="item in allSuggestions"
-            :key="item.id"
-            :item="item"
-            :categoryLabel="item.categoryLabel"
-            @approve="handleApprove"
-            @reject="handleReject"
-          />
+
+        <!-- Divider if both exist -->
+        <div v-if="quickFixes.length > 0 && stylisticGroups.length > 0" class="sections-divider"></div>
+
+        <!-- 2. Stylistic Revisions Section -->
+        <div v-if="stylisticGroups.length > 0" class="stylistic-revisions-section">
+          <div class="corrections-header" style="margin-bottom: 8px; padding: 0 4px;">
+            <h4 style="font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 700; margin: 0;">
+              Stylistic Revisions ({{ stylisticGroups.length }})
+            </h4>
+          </div>
+
+          <div class="stylistic-groups-list">
+            <div 
+              v-for="group in stylisticGroups" 
+              :key="group.key"
+              class="stylistic-card-wrapper"
+            >
+              <!-- Horizontal choices selector tab bar for overlapping alternatives -->
+              <div v-if="group.items.length > 1" class="alternatives-tabs-bar">
+                <button 
+                  v-for="(alt, idx) in group.items" 
+                  :key="alt.id"
+                  type="button"
+                  :class="['alt-tab-btn', { active: group.activeIndex === idx, approved: alt.approval_state === 'approved' }]"
+                  @click="setGroupActiveIndex(group.key, idx)"
+                >
+                  <span class="tab-indicator-dot"></span>
+                  <span class="tab-label-text">{{ alt.categoryLabel }}</span>
+                  <span v-if="alt.approval_state === 'approved'" class="tab-check-tick">✓</span>
+                </button>
+              </div>
+
+              <!-- Main Suggestion Card -->
+              <SuggestionItemComp
+                :item="group.items[group.activeIndex]"
+                :categoryLabel="group.items[group.activeIndex].categoryLabel"
+                :hasConflictApproval="false"
+                @approve="handleApprove"
+                @reject="handleReject"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div v-if="quickFixes.length === 0 && stylisticGroups.length === 0" class="review-empty" style="padding: 32px 16px;">
+          <p class="minimal-sidebar-instruction">All corrections applied or dismissed!</p>
         </div>
       </template>
     </div>
@@ -699,5 +849,321 @@ const allSuggestions = computed(() => {
 
 .resubmit-btn:hover svg {
   transform: translate(1px, -1px) scale(1.05);
+}
+
+/* Quick Fixes Section Styles */
+.quick-fixes-section {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-2);
+}
+
+.quick-fixes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.header-left-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chevron-indicator {
+  font-size: 8px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.chevron-indicator.collapsed {
+  transform: rotate(-90deg);
+}
+
+.header-left-title h4 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.quick-fixes-count-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-accept-all-quick {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.04);
+}
+
+.btn-accept-all-quick:hover {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #10b981;
+}
+
+html[data-theme="light"] .btn-accept-all-quick {
+  color: #059669;
+  border-color: rgba(5, 150, 105, 0.3);
+  background: rgba(5, 150, 105, 0.04);
+}
+
+html[data-theme="light"] .btn-accept-all-quick:hover {
+  background: rgba(5, 150, 105, 0.08);
+  border-color: rgba(5, 150, 105, 0.45);
+}
+
+.quick-fixes-rows-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.quick-fix-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-secondary);
+}
+
+.quick-fix-row:last-child {
+  border-bottom: none;
+}
+
+.quick-fix-row:hover {
+  background: var(--bg-hover);
+}
+
+.quick-fix-row.state-approved {
+  background: rgba(16, 185, 129, 0.02);
+}
+
+.quick-fix-row.state-approved:hover {
+  background: rgba(16, 185, 129, 0.04);
+}
+
+.quick-fix-info-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-fix-pill {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.quick-fix-diff-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-original {
+  color: var(--color-error);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.diff-arrow {
+  color: var(--text-muted);
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.diff-replacement {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.quick-fix-status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tick-icon {
+  color: #10b981;
+  font-weight: 800;
+  font-size: 11px;
+}
+
+html[data-theme="light"] .tick-icon {
+  color: #059669;
+}
+
+.bullet-icon {
+  width: 5px;
+  height: 5px;
+  background: var(--border-default);
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+.quick-fix-row:hover .bullet-icon {
+  opacity: 0.8;
+  background: var(--accent-primary);
+}
+
+.sections-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-2) 0;
+  opacity: 0.5;
+}
+
+/* Stylistic Revisions Card Layout Styles */
+.stylistic-card-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 12px;
+}
+
+.stylistic-card-wrapper :deep(.suggestion-card-minimal) {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.alternatives-tabs-bar {
+  display: flex;
+  gap: 3px;
+  background: var(--bg-tertiary);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.alternatives-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.alt-tab-btn {
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.alt-tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.alt-tab-btn.active {
+  background: var(--bg-primary);
+  color: var(--accent-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-indicator-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+}
+
+.alt-tab-btn.active .tab-indicator-dot {
+  background: var(--accent-primary);
+}
+
+.alt-tab-btn.approved {
+  color: #10b981;
+}
+
+html[data-theme="light"] .alt-tab-btn.approved {
+  color: #059669;
+}
+
+.alt-tab-btn.approved .tab-indicator-dot {
+  background: #10b981;
+}
+
+html[data-theme="light"] .alt-tab-btn.approved .tab-indicator-dot {
+  background: #059669;
+}
+
+.tab-check-tick {
+  font-size: 8px;
+  font-weight: 800;
+}
+
+/* Animations */
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: max-height 0.2s ease-in-out, opacity 0.2s ease-in-out;
+  max-height: 240px;
+  overflow: hidden;
+}
+
+.collapse-enter-from,
+.collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
 }
 </style>

@@ -63,6 +63,9 @@ const processedHighlightedContent = computed(() => {
       if (foundItem && foundGroup) {
         el.classList.add(`state-${foundItem.approval_state}`);
         el.classList.add(`category-${foundGroup.category}`);
+        if (foundItem.conflict_state === 'overlapping') {
+          el.classList.add('has-conflict');
+        }
         el.setAttribute('title', `${foundGroup.label || foundGroup.category}: ${foundItem.explanation}`);
       }
     }
@@ -81,10 +84,30 @@ const activeItem = ref<any>(null);
 const activeGroup = ref<any>(null); // SuggestionGroupWithItems
 
 const activeAlternatives = computed(() => {
-  if (!activeGroup.value || !activeItem.value) return [];
-  return activeGroup.value.items.filter((alt: any) =>
-    alt.span_start === activeItem.value.span_start &&
-    alt.span_end === activeItem.value.span_end
+  if (!activeItem.value) return [];
+  const list: any[] = [];
+  for (const g of review.groups.value) {
+    for (const item of g.items) {
+      const overlaps = !(item.span_end <= activeItem.value.span_start || item.span_start >= activeItem.value.span_end);
+      if (overlaps) {
+        list.push({
+          ...item,
+          categoryLabel: g.group.label || categoryLabels[g.group.category] || g.group.category
+        });
+      }
+    }
+  }
+  return list;
+});
+
+const activeItemHasOverlapConflict = computed(() => {
+  if (!activeItem.value || activeItem.value.approval_state === 'approved') return false;
+  return review.groups.value.some(g =>
+    g.items.some(otherItem =>
+      otherItem.id !== activeItem.value.id &&
+      otherItem.approval_state === 'approved' &&
+      !(activeItem.value.span_end <= otherItem.span_start || otherItem.span_end <= activeItem.value.span_start)
+    )
   );
 });
 
@@ -324,6 +347,12 @@ onUnmounted(() => {
           <div v-else-if="activeItem.approval_state === 'rejected'" class="popover-state-badge badge-rejected">✗ Dismissed</div>
         </div>
 
+        <!-- Conflict Banner -->
+        <div v-if="activeItem.conflict_state === 'overlapping'" class="popover-conflict-banner">
+          <span class="banner-icon">⚡</span>
+          <span class="banner-text">Alternative phrasing available.</span>
+        </div>
+
         <p class="popover-explanation">{{ activeItem.explanation }}</p>
 
         <!-- Compact Comparison Diffs -->
@@ -338,6 +367,12 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Conflict warning note in popover -->
+        <div v-if="activeItemHasOverlapConflict" class="popover-conflict-warning">
+          <span class="warning-icon-bulb">💡</span>
+          <span class="warning-text-note">Overlaps with an approved suggestion. Accepting this will swap them.</span>
+        </div>
+
         <!-- Alternatives Selection Picker (if group contains multiple options) -->
         <div v-if="activeAlternatives.length > 1" class="popover-alternatives">
           <div class="alternatives-title">Alternatives:</div>
@@ -348,6 +383,10 @@ onUnmounted(() => {
               :class="['alt-choice-btn', { active: alt.id === activeItem.id }]"
               @click="activeItem = alt"
             >
+              <div class="alt-choice-header-row">
+                <span class="alt-choice-category-pill">{{ alt.categoryLabel }}</span>
+                <span v-if="alt.approval_state === 'approved'" class="alt-choice-check">✓</span>
+              </div>
               <div class="alt-choice-text">{{ alt.replacement_text }}</div>
               <div class="alt-choice-meta">{{ alt.explanation }}</div>
             </button>
@@ -1051,5 +1090,101 @@ onUnmounted(() => {
 .popover-fade-leave-to {
   opacity: 0;
   transform: translateY(4px) scale(0.98);
+}
+
+/* Conflict Styles */
+.preview-content-interactive :deep(.preview-highlight-inserted.has-conflict),
+.preview-content-interactive :deep(.preview-highlight-original.has-conflict) {
+  border-bottom: 1.5px dashed #d97706 !important;
+  background-color: rgba(217, 119, 6, 0.05) !important;
+}
+
+.preview-content-interactive :deep(.preview-highlight-inserted.has-conflict:hover),
+.preview-content-interactive :deep(.preview-highlight-original.has-conflict:hover) {
+  background-color: rgba(217, 119, 6, 0.12) !important;
+  box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.25) !important;
+}
+
+/* Popover Conflict Styles */
+.popover-conflict-banner {
+  font-size: 9px;
+  font-weight: 700;
+  color: #d97706; /* amber-600 */
+  background: rgba(217, 119, 6, 0.08);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+html[data-theme="light"] .popover-conflict-banner {
+  color: #b45309; /* amber-700 */
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.popover-conflict-warning {
+  font-size: 10px;
+  color: #d97706; /* amber-600 */
+  background: rgba(217, 119, 6, 0.04);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  line-height: 1.4;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+html[data-theme="light"] .popover-conflict-warning {
+  color: #b45309; /* amber-700 */
+  background: rgba(180, 83, 9, 0.03);
+  border-color: rgba(180, 83, 9, 0.15);
+}
+
+.warning-icon-bulb {
+  font-size: 11px;
+}
+
+.warning-text-note {
+  flex: 1;
+}
+
+.alt-choice-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.alt-choice-category-pill {
+  font-size: 7.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.02em;
+}
+
+.alt-choice-btn.active .alt-choice-category-pill {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent-primary);
+}
+
+.alt-choice-check {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #10b981;
+}
+
+html[data-theme="light"] .alt-choice-check {
+  color: #059669;
 }
 </style>

@@ -1,5 +1,6 @@
 import { storeToRefs } from 'pinia';
 import { useReviewStore } from '../stores/review';
+import { useAppStore } from '../stores/app';
 import { startReview, updateSuggestionApproval, computePreview, applyApprovedSuggestions, getReviewSuggestions } from './useTauri';
 
 export function useReview() {
@@ -38,17 +39,56 @@ export function useReview() {
 
   const toggleItemApproval = async (itemId: string, state: string) => {
     await updateSuggestionApproval({ itemId, approvalState: state });
-    // Update local state
+    
+    // Find our target item first
+    let targetItem: any = null;
     for (const g of groups.value) {
-      const item = g.items.find(i => i.id === itemId);
-      if (item) {
-        item.approval_state = state as any;
-        // Recompute group state
-        const allApproved = g.items.every(i => i.approval_state === 'approved');
-        const allRejected = g.items.every(i => i.approval_state === 'rejected');
-        const someApproved = g.items.some(i => i.approval_state === 'approved');
-        g.group.approval_state = allApproved ? 'approved' : allRejected ? 'rejected' : someApproved ? 'partial' : 'pending';
+      const found = g.items.find(i => i.id === itemId);
+      if (found) {
+        targetItem = found;
         break;
+      }
+    }
+
+    // Update local state and check conflicts
+    if (targetItem) {
+      targetItem.approval_state = state as any;
+
+      if (state === 'approved') {
+        const appStore = useAppStore();
+        for (const otherG of groups.value) {
+          for (const otherItem of otherG.items) {
+            if (otherItem.id !== itemId && otherItem.approval_state === 'approved') {
+              const overlaps = !(targetItem.span_end <= otherItem.span_start || otherItem.span_end <= targetItem.span_start);
+              if (overlaps) {
+                // Auto-deselect!
+                otherItem.approval_state = 'pending';
+                await updateSuggestionApproval({ itemId: otherItem.id, approvalState: 'pending' });
+                
+                // Notify the user!
+                const origText = otherItem.original_text.length > 25 ? otherItem.original_text.slice(0, 25) + '...' : otherItem.original_text;
+                appStore.notify(`Deselected conflicting approved suggestion: "${origText}"`, 'info');
+                
+                // Recompute the other item's group state!
+                const allApproved = otherG.items.every(i => i.approval_state === 'approved');
+                const allRejected = otherG.items.every(i => i.approval_state === 'rejected');
+                const someApproved = otherG.items.some(i => i.approval_state === 'approved');
+                otherG.group.approval_state = allApproved ? 'approved' : allRejected ? 'rejected' : someApproved ? 'partial' : 'pending';
+              }
+            }
+          }
+        }
+      }
+
+      // Recompute target item's group state
+      for (const g of groups.value) {
+        if (g.items.some(i => i.id === itemId)) {
+          const allApproved = g.items.every(i => i.approval_state === 'approved');
+          const allRejected = g.items.every(i => i.approval_state === 'rejected');
+          const someApproved = g.items.some(i => i.approval_state === 'approved');
+          g.group.approval_state = allApproved ? 'approved' : allRejected ? 'rejected' : someApproved ? 'partial' : 'pending';
+          break;
+        }
       }
     }
   };
@@ -58,7 +98,38 @@ export function useReview() {
     const g = groups.value.find(g => g.group.id === groupId);
     if (g) {
       g.group.approval_state = state as any;
-      g.items.forEach(item => { item.approval_state = state as any; });
+      
+      // Update each item in the group
+      for (const item of g.items) {
+        item.approval_state = state as any;
+        
+        if (state === 'approved') {
+          const appStore = useAppStore();
+          // Check conflict with other approved items in OTHER groups
+          for (const otherG of groups.value) {
+            if (otherG.group.id !== groupId) {
+              for (const otherItem of otherG.items) {
+                if (otherItem.approval_state === 'approved') {
+                  const overlaps = !(item.span_end <= otherItem.span_start || otherItem.span_end <= item.span_start);
+                  if (overlaps) {
+                    otherItem.approval_state = 'pending';
+                    await updateSuggestionApproval({ itemId: otherItem.id, approvalState: 'pending' });
+                    
+                    const origText = otherItem.original_text.length > 25 ? otherItem.original_text.slice(0, 25) + '...' : otherItem.original_text;
+                    appStore.notify(`Deselected conflicting approved suggestion: "${origText}"`, 'info');
+                    
+                    // Recompute the other item's group state!
+                    const allApproved = otherG.items.every(i => i.approval_state === 'approved');
+                    const allRejected = otherG.items.every(i => i.approval_state === 'rejected');
+                    const someApproved = otherG.items.some(i => i.approval_state === 'approved');
+                    otherG.group.approval_state = allApproved ? 'approved' : allRejected ? 'rejected' : someApproved ? 'partial' : 'pending';
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   };
 

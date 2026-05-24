@@ -5,6 +5,7 @@ import type { SuggestionItem as SuggestionItemType } from '../types';
 const props = defineProps<{
   item: SuggestionItemType;
   categoryLabel: string;
+  hasConflictApproval?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -99,12 +100,15 @@ const formattedDiffs = computed(() => {
 
 <template>
   <div 
-    :class="['suggestion-card-minimal', `state-${item.approval_state}`]" 
+    :class="['suggestion-card-minimal', `state-${item.approval_state}`, { 'has-conflict-border': hasConflictApproval && item.approval_state !== 'approved' }]" 
     :data-suggestion-card-id="item.id"
     @click="emit('approve', item.id)"
   >
     <div class="card-meta-row">
-      <span class="category-pill-label">{{ categoryLabel }}</span>
+      <div style="display: inline-flex; align-items: center; gap: 6px;">
+        <span class="category-pill-label">{{ categoryLabel }}</span>
+        <span v-if="item.conflict_state === 'overlapping'" class="alternative-badge">⚡ Alternative</span>
+      </div>
       <span v-if="item.approval_state === 'approved'" class="approved-badge-tick">✓ Approved</span>
     </div>
 
@@ -117,6 +121,11 @@ const formattedDiffs = computed(() => {
     </div>
 
     <p v-if="item.explanation" class="suggestion-brief-desc">{{ item.explanation }}</p>
+
+    <div v-if="hasConflictApproval && item.approval_state !== 'approved'" class="conflict-warning-note">
+      <span class="warning-icon-bulb">💡</span>
+      <span class="warning-text-note">Overlaps with an approved suggestion. Accepting this will swap them.</span>
+    </div>
   </div>
 </template>
 
@@ -308,5 +317,66 @@ html[data-theme="light"] :deep(.word-added) {
 .suggestion-card-minimal.highlight-glow {
   animation: highlight-glow-pulse 2.2s cubic-bezier(0.25, 0.8, 0.25, 1);
   z-index: 10;
+}
+
+/* Conflict Styles */
+.suggestion-card-minimal.has-conflict-border {
+  border-color: rgba(217, 119, 6, 0.2);
+  box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.05), var(--shadow-sm);
+}
+
+.suggestion-card-minimal.has-conflict-border:hover {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: var(--bg-hover);
+}
+
+.alternative-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #d97706; /* amber-600 */
+  background: rgba(217, 119, 6, 0.08);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  animation: badge-pulse 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-theme="light"] .alternative-badge {
+  color: #b45309; /* amber-700 */
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.conflict-warning-note {
+  font-size: 10px;
+  color: #d97706; /* amber-600 */
+  background: rgba(217, 119, 6, 0.05);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  margin-top: 2px;
+  line-height: 1.4;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+html[data-theme="light"] .conflict-warning-note {
+  color: #b45309; /* amber-700 */
+  background: rgba(180, 83, 9, 0.04);
+  border-color: rgba(180, 83, 9, 0.15);
+}
+
+.warning-icon-bulb {
+  font-size: 11px;
+  opacity: 0.95;
+}
+
+.warning-text-note {
+  flex: 1;
 }
 </style>
