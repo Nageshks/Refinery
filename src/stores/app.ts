@@ -6,7 +6,12 @@ import { usePagesStore } from './pages';
 import { getGpuAcceleration, setGpuAcceleration } from '../composables/useTauri';
 
 export const useAppStore = defineStore('app', () => {
-  const sidebarCollapsed = ref(false);
+  const sidebarCollapsed = ref(localStorage.getItem('refinery_sidebar_collapsed') === 'true');
+
+  watch(sidebarCollapsed, (val) => {
+    localStorage.setItem('refinery_sidebar_collapsed', val ? 'true' : 'false');
+  });
+
   const activeView = ref<ViewMode>('edit');
   const showCompareModal = ref(false);
   const showSettingsModal = ref(false);
@@ -66,13 +71,13 @@ export const useAppStore = defineStore('app', () => {
   const accentColor = ref<'purple' | 'emerald' | 'ocean' | 'amber' | 'rose'>((localStorage.getItem('refinery_accent_color') as any) || 'purple');
   const highlightColor = ref<'purple' | 'gold' | 'mint' | 'sky'>((localStorage.getItem('refinery_highlight_color') as any) || 'purple');
   const editorWidth = ref<'cozy' | 'wide'>((localStorage.getItem('refinery_editor_width') as any) || 'cozy');
-  const editorFont = ref<'sans' | 'serif' | 'mono' | 'slab' | 'geometric'>((localStorage.getItem('refinery_editor_font') as any) || 'sans');
+  const editorFont = ref<'sans' | 'inter' | 'outfit' | 'jakarta' | 'instrument' | 'merriweather' | 'lora' | 'mono' | 'atkinson' | 'lexend' | 'poppins' | 'montserrat'>((localStorage.getItem('refinery_editor_font') as any) || 'inter');
   const lineHeight = ref(Number(localStorage.getItem('refinery_line_height') || '1.6'));
   const zenFocusEnabled = ref(localStorage.getItem('refinery_zen_focus') === 'true');
   const gpuAccelerationEnabled = ref(true);
 
   // New Personalization & Accessibility Controls
-  const canvasBg = ref<'default' | 'dracula' | 'slate' | 'parchment' | 'contrast'>((localStorage.getItem('refinery_canvas_bg') as any) || 'default');
+  const canvasBg = ref<'default' | 'dracula' | 'slate' | 'parchment' | 'contrast' | 'nord' | 'rose' | 'stark' | 'alabaster' | 'sakura'>((localStorage.getItem('refinery_canvas_bg') as any) || 'default');
   const uiLayoutVariant = ref<'unified' | 'contrasted' | 'glassmorphic'>((localStorage.getItem('refinery_ui_layout_variant') as any) || 'contrasted');
   const editorFontSize = ref(Number(localStorage.getItem('refinery_editor_font_size') || '14'));
   const appbarHidden = ref(localStorage.getItem('refinery_appbar_hidden') === 'true');
@@ -281,6 +286,24 @@ export const useAppStore = defineStore('app', () => {
     }
   };
 
+  const rightRailCollapsed = ref(localStorage.getItem('refinery_right_rail_collapsed') === 'true');
+
+  watch(rightRailCollapsed, (val) => {
+    localStorage.setItem('refinery_right_rail_collapsed', val ? 'true' : 'false');
+    if (val) {
+      activeSidebarTab.value = null;
+      auditPanelVisible.value = false;
+      if (activeView.value === 'review') {
+        setView('edit');
+      }
+    }
+  });
+
+  const toggleRightSidebar = () => {
+    rightRailCollapsed.value = !rightRailCollapsed.value;
+    notify(`Right Sidebar Rail ${rightRailCollapsed.value ? 'Hidden' : 'Visible'}`, 'success');
+  };
+
   const doPageSwitch = async (id: string) => {
     const pagesStore = usePagesStore();
     const reviewStore = useReviewStore();
@@ -393,6 +416,8 @@ export const useAppStore = defineStore('app', () => {
     zoomIn,
     zoomOut,
     resetZoom,
-    applyZoom
+    applyZoom,
+    toggleRightSidebar,
+    rightRailCollapsed
   };
 });

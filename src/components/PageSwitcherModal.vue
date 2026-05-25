@@ -12,13 +12,29 @@ const searchQuery = ref('');
 const selectedIndex = ref(0);
 const inputRef = ref<HTMLInputElement | null>(null);
 
+const currentView = ref<'main' | 'canvas-bg'>('main');
+const originalCanvasBg = ref<string>('');
+
+const canvasBgItems = [
+  { id: 'default', name: 'Charcoal', desc: 'Balanced grey-slate draft canvas', icon: '🌑' },
+  { id: 'stark', name: 'Minimal Stark', desc: 'Absolute distraction-free high-ink contrast', icon: '⚪' },
+  { id: 'alabaster', name: 'Alabaster', desc: 'Clean off-white with cool-grey touch', icon: '🌫️' },
+  { id: 'sakura', name: 'Cozy Sakura', desc: 'Soothing off-white with warm rose blush', icon: '🌸' },
+  { id: 'dracula', name: 'Gothic Dracula', desc: 'Vibrant violet-gothic overlay style', icon: '🧛' },
+  { id: 'slate', name: 'Slate Blue', desc: 'Calming, deep slate blue-grey preset', icon: '🦕' },
+  { id: 'nord', name: 'Nordic Frost', desc: 'Frost-grey and nordic slate elements', icon: '❄️' },
+  { id: 'rose', name: 'Rose Pine', desc: 'Dusky twilight pink-rose and gold-clay', icon: '🌲' },
+  { id: 'parchment', name: 'Warm Ivory', desc: 'Comforting sepia warm paper textures', icon: '📜' },
+  { id: 'contrast', name: 'High Contrast', desc: 'Pure solid high-contrast borders', icon: '☯️' }
+];
+
 // Predefined palette commands
 interface CommandItem {
   id: string;
   title: string;
   subtitle?: string;
   icon?: string;
-  category: 'Commands' | 'Pages';
+  category: 'Commands' | 'Pages' | 'Canvas Environments';
   action: () => void;
 }
 
@@ -150,6 +166,17 @@ const commands: CommandItem[] = [
     }
   },
   {
+    id: 'toggle-right-sidebar',
+    title: 'Toggle Right Sidebar',
+    subtitle: 'Show or hide the AI tools and auditor right panel',
+    icon: '📋',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Executing Toggle Right Sidebar.');
+      appStore.toggleRightSidebar();
+    }
+  },
+  {
     id: 'toggle-appbar',
     title: 'Toggle Title/App Bar',
     subtitle: 'Show or hide the top menu and window action bar',
@@ -197,6 +224,20 @@ const commands: CommandItem[] = [
       console.log('CommandPalette: Executing Toggle Audit Panel.');
       appStore.toggleAuditorPanel();
     }
+  },
+  {
+    id: 'switch-canvas-bg',
+    title: 'Switch Canvas Environment (Theme)...',
+    subtitle: 'Interactively preview and select canvas backgrounds',
+    icon: '🎨',
+    category: 'Commands',
+    action: () => {
+      console.log('CommandPalette: Morphing into Canvas Bg view.');
+      originalCanvasBg.value = appStore.canvasBg;
+      currentView.value = 'canvas-bg';
+      searchQuery.value = '';
+      selectedIndex.value = 0;
+    }
   }
 ];
 
@@ -220,6 +261,26 @@ const formatDate = (dateStr: string | null | undefined) => {
 const filteredItems = computed(() => {
   try {
     const q = searchQuery.value.toLowerCase().trim();
+
+    if (currentView.value === 'canvas-bg') {
+      const items: CommandItem[] = canvasBgItems.map((bg): CommandItem => ({
+        id: bg.id,
+        title: bg.name,
+        subtitle: bg.desc,
+        icon: bg.icon,
+        category: 'Canvas Environments',
+        action: () => {
+          appStore.canvasBg = bg.id as any;
+          appStore.notify(`Canvas environment set to "${bg.name}"`, 'success');
+        }
+      }));
+      if (!q) return items;
+      return items.filter(item => 
+        item.title.toLowerCase().includes(q) || 
+        (item.subtitle && item.subtitle.toLowerCase().includes(q))
+      );
+    }
+
     const rawPages = pagesStore.pages || [];
 
     // Page items formatted as executable switcher items
@@ -259,7 +320,38 @@ const filteredItems = computed(() => {
 // Keep selectedIndex within bounds when results list changes
 watch(filteredItems, () => {
   selectedIndex.value = 0;
+  if (currentView.value === 'canvas-bg' && filteredItems.value.length > 0) {
+    const activeItem = filteredItems.value[0];
+    if (activeItem) {
+      appStore.canvasBg = activeItem.id as any;
+    }
+  }
 }, { deep: true });
+
+// Live arrow-key real-time previews for canvas backgrounds
+watch(selectedIndex, (newIdx) => {
+  if (currentView.value === 'canvas-bg' && filteredItems.value.length > 0) {
+    const activeItem = filteredItems.value[newIdx];
+    if (activeItem) {
+      appStore.canvasBg = activeItem.id as any;
+    }
+  }
+});
+
+// Safely restore start environment on cancel / Esc / Backdrop clicks
+const handleCancel = () => {
+  if (currentView.value === 'canvas-bg') {
+    appStore.canvasBg = originalCanvasBg.value as any;
+    currentView.value = 'main';
+    searchQuery.value = '';
+    selectedIndex.value = 0;
+    nextTick(() => {
+      inputRef.value?.focus();
+    });
+  } else {
+    appStore.showPageSwitcher = false;
+  }
+};
 
 onMounted(() => {
   console.log('PageSwitcherModal: Component mounted.');
@@ -295,6 +387,15 @@ const scrollActiveIntoView = () => {
 const executeItem = async (item: CommandItem) => {
   if (!item) return;
   console.log('PageSwitcherModal: Executing item:', item.title);
+
+  if (item.id === 'switch-canvas-bg') {
+    await item.action();
+    nextTick(() => {
+      inputRef.value?.focus();
+    });
+    return;
+  }
+
   appStore.showPageSwitcher = false;
   try {
     await item.action();
@@ -324,20 +425,30 @@ const handleEnter = async () => {
 </script>
 
 <template>
-  <div class="modal-backdrop switcher-backdrop" @click="appStore.showPageSwitcher = false">
+  <div :class="['modal-backdrop', 'switcher-backdrop', { 'preview-mode': currentView === 'canvas-bg' }]" @click="handleCancel">
     <div class="switcher-modal" @click.stop>
       <div class="switcher-search-container">
-        <span class="switcher-search-icon">🔍</span>
+        <!-- Back Arrow Button for Canvas Mode -->
+        <button 
+          v-if="currentView === 'canvas-bg'" 
+          class="btn btn-ghost btn-icon sm switcher-back-btn" 
+          @click="handleCancel" 
+          title="Back to commands"
+          style="margin-right: var(--space-1); width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; padding: 0; min-height: 0; background: transparent; border: none; cursor: pointer; color: var(--text-muted);"
+        >
+          ←
+        </button>
+        <span v-else class="switcher-search-icon">🔍</span>
         <input 
           ref="inputRef"
           type="text" 
           class="switcher-input" 
           v-model="searchQuery" 
-          placeholder="Search pages or type commands..."
+          :placeholder="currentView === 'canvas-bg' ? 'Filter environments... (Esc to cancel)' : 'Search pages or type commands...'"
           @keydown.down.prevent="navigateDown"
           @keydown.up.prevent="navigateUp"
           @keydown.enter.prevent="handleEnter"
-          @keydown.esc.prevent="appStore.showPageSwitcher = false"
+          @keydown.esc.prevent="handleCancel"
         />
         <span class="switcher-esc-badge">ESC</span>
       </div>
@@ -385,9 +496,13 @@ const handleEnter = async () => {
 
       <div class="switcher-footer">
         <div class="footer-help">
-          <span><kbd class="kbd">↑↓</kbd> Navigate</span>
-          <span><kbd class="kbd">Enter</kbd> Execute</span>
-          <span><kbd class="kbd">Esc</kbd> Close</span>
+          <span v-if="currentView === 'canvas-bg'"><kbd class="kbd">↑↓</kbd> Preview Theme</span>
+          <span v-else><kbd class="kbd">↑↓</kbd> Navigate</span>
+          
+          <span v-if="currentView === 'canvas-bg'"><kbd class="kbd">Enter</kbd> Apply Theme</span>
+          <span v-else><kbd class="kbd">Enter</kbd> Execute</span>
+          
+          <span><kbd class="kbd">Esc</kbd> {{ currentView === 'canvas-bg' ? 'Cancel' : 'Close' }}</span>
         </div>
       </div>
     </div>
@@ -406,6 +521,12 @@ const handleEnter = async () => {
   padding-top: 15vh;
   z-index: 2000;
   animation: fadeIn var(--transition-fast);
+  transition: background 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+.switcher-backdrop.preview-mode {
+  background: rgba(0, 0, 0, 0.08); /* Near-transparent background tint */
+  backdrop-filter: none; /* Zero blur to ensure complete backdrop visibility */
 }
 
 .switcher-modal {

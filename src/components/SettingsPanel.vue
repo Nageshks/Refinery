@@ -757,8 +757,13 @@ const cancelEditingCheck = () => {
                       <button 
                         v-for="bg in [
                           { id: 'default', name: 'Charcoal', color: '#111318', lightColor: '#F8F9FC' },
+                          { id: 'stark', name: 'Minimal Stark', color: '#000000', lightColor: '#FFFFFF' },
+                          { id: 'alabaster', name: 'Alabaster', color: '#18191A', lightColor: '#F9F9FB' },
+                          { id: 'sakura', name: 'Cozy Sakura', color: '#1D1518', lightColor: '#FFF5F7' },
                           { id: 'dracula', name: 'Gothic Dracula', color: '#191622', lightColor: '#F6F3FC' },
                           { id: 'slate', name: 'Slate Blue', color: '#0F172A', lightColor: '#F1F5F9' },
+                          { id: 'nord', name: 'Nordic Frost', color: '#2E3440', lightColor: '#ECEFF4' },
+                          { id: 'rose', name: 'Rose Pine', color: '#191724', lightColor: '#FAF4ED' },
                           { id: 'parchment', name: 'Warm Ivory', color: '#181411', lightColor: '#F5EEDB' },
                           { id: 'contrast', name: 'High Contrast', color: '#000000', lightColor: '#FFFFFF' }
                         ]"
@@ -816,11 +821,18 @@ const cancelEditingCheck = () => {
                     <div class="font-selector-expanded">
                       <button 
                         v-for="f in [
-                          { id: 'sans', name: 'Sans-Serif', family: 'var(--font-sans)' },
-                          { id: 'serif', name: 'Serif', family: 'Georgia, serif' },
-                          { id: 'mono', name: 'Monospace', family: 'var(--font-mono)' },
-                          { id: 'slab', name: 'Slab Serif', family: 'Courier Prime, Courier, monospace' },
-                          { id: 'geometric', name: 'Geometric', family: 'Outfit, Montserrat, sans-serif' }
+                          { id: 'inter', name: 'Inter', family: 'Inter, var(--font-sans)' },
+                          { id: 'outfit', name: 'Outfit', family: 'Outfit, var(--font-sans)' },
+                          { id: 'jakarta', name: 'Plus Jakarta', family: 'Plus Jakarta Sans, var(--font-sans)' },
+                          { id: 'instrument', name: 'Instrument', family: 'Instrument Sans, var(--font-sans)' },
+                          { id: 'atkinson', name: 'Atkinson', family: 'Atkinson Hyperlegible, var(--font-sans)' },
+                          { id: 'lexend', name: 'Lexend', family: 'Lexend, var(--font-sans)' },
+                          { id: 'poppins', name: 'Poppins', family: 'Poppins, var(--font-sans)' },
+                          { id: 'montserrat', name: 'Montserrat', family: 'Montserrat, var(--font-sans)' },
+                          { id: 'merriweather', name: 'Merriweather', family: 'Merriweather, Georgia, serif' },
+                          { id: 'lora', name: 'Lora', family: 'Lora, Georgia, serif' },
+                          { id: 'mono', name: 'JetBrains Mono', family: 'JetBrains Mono, var(--font-mono)' },
+                          { id: 'sans', name: 'System default', family: 'var(--font-sans)' }
                         ]"
                         :key="f.id"
                         :class="['font-btn-selector-expanded', { active: appStore.editorFont === f.id }]"

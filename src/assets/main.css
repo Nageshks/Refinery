@@ -127,9 +127,9 @@ html[data-theme="light"] {
   --accent-border: rgba(109, 40, 217, 0.16);
 
   /* ─── Text ──────────────────────────────────────────────────────── */
-  --text-primary: #1C1E24;
-  --text-secondary: #565C6A;
-  --text-muted: #8F96A3;
+  --text-primary: #12141A;
+  --text-secondary: #40444D;
+  --text-muted: #727985;
   --text-disabled: #C2C7D0;
   --text-inverse: #FFFFFF;
 
@@ -756,25 +756,54 @@ html[data-accent="rose"][data-theme="light"] {
 }
 
 /* ─── Fonts Typography overrides on Tiptap editor ─── */
-html[data-editor-font="serif"] .tiptap {
-  font-family: 'Merriweather', 'Lora', Georgia, serif !important;
-  letter-spacing: 0.01em !important;
-  font-weight: 400 !important;
-}
-html[data-editor-font="mono"] .tiptap {
-  font-family: var(--font-mono) !important;
-  letter-spacing: -0.01em !important;
-}
 html[data-editor-font="sans"] .tiptap {
   font-family: var(--font-sans) !important;
 }
-html[data-editor-font="slab"] .tiptap {
-  font-family: 'Courier Prime', 'Arvo', Courier, monospace !important;
+html[data-editor-font="inter"] .tiptap {
+  font-family: 'Inter', var(--font-sans) !important;
+  letter-spacing: -0.011em !important;
+}
+html[data-editor-font="outfit"] .tiptap {
+  font-family: 'Outfit', var(--font-sans) !important;
+  letter-spacing: 0.02em !important;
+}
+html[data-editor-font="jakarta"] .tiptap {
+  font-family: 'Plus Jakarta Sans', var(--font-sans) !important;
   letter-spacing: -0.01em !important;
 }
-html[data-editor-font="geometric"] .tiptap {
-  font-family: 'Outfit', 'Montserrat', sans-serif !important;
-  letter-spacing: 0.02em !important;
+html[data-editor-font="instrument"] .tiptap {
+  font-family: 'Instrument Sans', var(--font-sans) !important;
+  letter-spacing: -0.015em !important;
+}
+html[data-editor-font="merriweather"] .tiptap {
+  font-family: 'Merriweather', Georgia, serif !important;
+  letter-spacing: 0.01em !important;
+  font-weight: 400 !important;
+}
+html[data-editor-font="lora"] .tiptap {
+  font-family: 'Lora', Georgia, serif !important;
+  letter-spacing: 0.005em !important;
+  font-weight: 400 !important;
+}
+html[data-editor-font="mono"] .tiptap {
+  font-family: 'JetBrains Mono', var(--font-mono) !important;
+  letter-spacing: -0.015em !important;
+}
+html[data-editor-font="atkinson"] .tiptap {
+  font-family: 'Atkinson Hyperlegible', var(--font-sans) !important;
+  letter-spacing: -0.005em !important;
+}
+html[data-editor-font="lexend"] .tiptap {
+  font-family: 'Lexend', var(--font-sans) !important;
+  letter-spacing: -0.01em !important;
+}
+html[data-editor-font="poppins"] .tiptap {
+  font-family: 'Poppins', var(--font-sans) !important;
+  letter-spacing: -0.005em !important;
+}
+html[data-editor-font="montserrat"] .tiptap {
+  font-family: 'Montserrat', var(--font-sans) !important;
+  letter-spacing: -0.01em !important;
 }
 
 /* Apply Line Height and Font Size dynamically in editor content styling */
@@ -858,6 +887,106 @@ html[data-canvas-bg="contrast"][data-theme="light"] {
   --border-strong: #000000;
 }
 
+html[data-canvas-bg="nord"] {
+  --bg-primary: #2E3440;
+  --bg-secondary: #3B4252;
+  --bg-tertiary: #434C5E;
+  --bg-input: #3B4252;
+  --bg-hover: #4C566A;
+  --border-subtle: rgba(216, 222, 233, 0.08);
+  --border-default: rgba(216, 222, 233, 0.15);
+}
+html[data-canvas-bg="nord"][data-theme="light"] {
+  --bg-primary: #ECEFF4;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #D8DEE9;
+  --bg-input: #FFFFFF;
+  --bg-hover: #E5E9F0;
+  --text-primary: #2E3440;
+  --text-secondary: #4C566A;
+  --border-subtle: rgba(46, 52, 64, 0.08);
+  --border-default: rgba(46, 52, 64, 0.15);
+}
+
+html[data-canvas-bg="rose"] {
+  --bg-primary: #191724;
+  --bg-secondary: #1F1D2E;
+  --bg-tertiary: #26233A;
+  --bg-input: #1F1D2E;
+  --bg-hover: #31748F1F;
+  --border-subtle: rgba(224, 222, 244, 0.08);
+  --border-default: rgba(224, 222, 244, 0.15);
+}
+html[data-canvas-bg="rose"][data-theme="light"] {
+  --bg-primary: #FAF4ED;
+  --bg-secondary: #FFFAF3;
+  --bg-tertiary: #F2E9E1;
+  --bg-input: #FFFAF3;
+  --bg-hover: #E0DEF4;
+  --text-primary: #2d2847;
+  --text-secondary: #575279;
+  --border-subtle: rgba(45, 40, 71, 0.08);
+  --border-default: rgba(45, 40, 71, 0.16);
+}
+
+html[data-canvas-bg="stark"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0D0D0D;
+  --bg-tertiary: #161616;
+  --bg-input: #000000;
+  --bg-hover: #262626;
+  --border-subtle: #222222;
+}
+html[data-canvas-bg="stark"][data-theme="light"] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #FAFAFA;
+  --bg-tertiary: #F1F1F1;
+  --bg-input: #FFFFFF;
+  --bg-hover: #ECECEC;
+  --text-primary: #000000;
+  --text-secondary: #333333;
+  --border-subtle: #ECECEC;
+}
+
+html[data-canvas-bg="alabaster"] {
+  --bg-primary: #18191A;
+  --bg-secondary: #1F2022;
+  --bg-tertiary: #27282B;
+  --bg-input: #1F2022;
+  --bg-hover: #2F3135;
+  --border-subtle: rgba(255, 255, 255, 0.05);
+}
+html[data-canvas-bg="alabaster"][data-theme="light"] {
+  --bg-primary: #F9F9FB;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #EEF0F2;
+  --bg-input: #FFFFFF;
+  --bg-hover: #E3E6E8;
+  --text-primary: #1A1C1E;
+  --text-secondary: #4C4E51;
+  --border-subtle: rgba(0, 0, 0, 0.05);
+}
+
+html[data-canvas-bg="sakura"] {
+  --bg-primary: #1D1518;
+  --bg-secondary: #251B1F;
+  --bg-tertiary: #2E2227;
+  --bg-input: #251B1F;
+  --bg-hover: #3B2B32;
+  --border-subtle: rgba(255, 240, 245, 0.05);
+}
+html[data-canvas-bg="sakura"][data-theme="light"] {
+  --bg-primary: #FFF5F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #FFE2E7;
+  --bg-input: #FFFFFF;
+  --bg-hover: #FFD6E0;
+  --text-primary: #1C0A10;
+  --text-secondary: #4A2733;
+  --border-subtle: rgba(28, 10, 16, 0.08);
+  --border-default: rgba(28, 10, 16, 0.16);
+}
+
 /* ─── UI Layout Variants (data-ui-variant) ─── */
 html[data-ui-variant="unified"] .sidebar,
 html[data-ui-variant="unified"] .appbar {
@@ -894,6 +1023,7 @@ html[data-editor-width="wide"] .tiptap {
 html.zen-active .sidebar,
 html.zen-active .appbar,
 html.zen-active .review-panel,
+html.zen-active .sidebar-rail,
 html.zen-active .sidebar-resizer,
 html.zen-active .panel-resizer {
   opacity: 0 !important;
@@ -903,7 +1033,8 @@ html.zen-active .panel-resizer {
 
 .sidebar,
 .appbar,
-.review-panel {
+.review-panel,
+.sidebar-rail {
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), width var(--transition-slow);
 }
 

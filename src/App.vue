@@ -89,7 +89,7 @@ onUnmounted(() => {
         <AuditPanel v-if="appStore.auditPanelVisible && pagesStore.activePage" />
 
         <!-- Vertical Sidebar Rail (Collapse Pins) -->
-        <div class="sidebar-rail" v-if="pagesStore.activePage">
+        <div class="sidebar-rail" v-if="pagesStore.activePage && !appStore.rightRailCollapsed">
           <button 
             :class="['rail-btn', { active: appStore.activeSidebarTab === 'speller' }]" 
             @click="appStore.toggleSpellerPanel()"
